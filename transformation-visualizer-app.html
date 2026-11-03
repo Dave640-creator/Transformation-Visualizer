@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformation Visualizer</title>
+<style>
+:root{--bg:#eef1f8;--panel:#fff;--ink:#1b2236;--mute:#5f6b85;--line:#d8deec;--on:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1424;--panel:#182038;--ink:#e8ecf8;--mute:#9aa6c6;--line:#2a3558;--on:#60a5fa}}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.top b{font-size:1rem;white-space:nowrap}
+.seg{display:flex;margin-left:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{font:inherit;font-weight:600;color:var(--mute);background:transparent;border:0;border-radius:9px;padding:8px 16px;min-height:40px;cursor:pointer}
+.seg button[aria-selected=true]{background:var(--on);color:#fff}
+.seg button:focus-visible{outline:3px solid var(--on);outline-offset:2px}
+.frames{position:relative;flex:1;min-height:0}
+iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg)}
+iframe.off{visibility:hidden;pointer-events:none}
+@media(max-width:520px){.top b{display:none}.seg{margin:0 auto;width:100%}.seg button{flex:1}}
+</style></head>
+<body>
+<div class="top"><b>Transformation Visualizer</b>
+<div class="seg" role="tablist" aria-label="Choose 2D or 3D">
+<button role="tab" id="t2" aria-selected="true">2D · 3×3</button><button role="tab" id="t3" aria-selected="false">3D · 4×4</button></div></div>
+<div class="frames">
+<iframe id="f2" title="2D transformation visualizer" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;title&gt;Transformation Visualizer&lt;/title&gt;
+&lt;style&gt;
+:root{--bg:#eef1f8;--panel:#fff;--ink:#1b2236;--mute:#5f6b85;--line:#d8deec;--grid:#e3e8f3;--axis:#9aa6c2;--orig:#8d99b5;--final:#2563eb;--cS:#7c3aed;--cH:#c026d3;--cR:#d97706;--cT:#0d9488;--cM:#2563eb;--pivot:#e11d48;--goal:#16a34a}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1424;--panel:#182038;--ink:#e8ecf8;--mute:#9aa6c6;--line:#2a3558;--grid:#222b48;--axis:#56628a;--orig:#6d7aa0;--final:#60a5fa;--cS:#a78bfa;--cH:#e879f9;--cR:#fbbf24;--cT:#2dd4bf;--cM:#60a5fa;--pivot:#fb7185;--goal:#4ade80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif}
+.app{max-width:980px;margin:0 auto;padding:0 14px 28px}
+header{padding:16px 2px 10px}h1{font-size:1.4rem;margin:0}header p{margin:2px 0 0;color:var(--mute);font-size:.92rem}
+.layout{display:grid;gap:14px}
+@media(min-width:800px){.layout{grid-template-columns:1fr 1fr;align-items:start}.stage{position:sticky;top:12px}}
+.card,.stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.stage{padding:10px}
+@media(max-width:799px){.stage{position:sticky;top:0;z-index:5;border-radius:0 0 14px 14px;margin:0 -14px;border-top:0}}
+canvas{display:block;width:min(100%,42vh);aspect-ratio:1;margin:0 auto;border-radius:10px;cursor:grab;touch-action:none;background:var(--bg)}
+@media(min-width:800px){canvas{width:100%}}
+.bar,.chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.chips{gap:6px}
+.sum,.goal{font-size:.86rem;color:var(--mute);margin:6px 2px 0}.goal{color:var(--goal);font-weight:700}
+button,select,.mi{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:40px;cursor:pointer}
+button.go{background:var(--final);border-color:var(--final);color:#fff;font-weight:600}
+:focus-visible{outline:3px solid var(--final);outline-offset:2px}
+.sw{display:flex;align-items:center;gap:6px;font-size:.9rem;margin-left:auto;cursor:pointer}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--final)}
+.chip{display:inline-flex;padding:3px 10px;border-radius:99px;font-size:.82rem;font-weight:600;border:2px solid var(--c);color:var(--c);min-height:0;background:transparent}
+.chip.on{background:var(--c);color:var(--panel)}
+.panel{display:grid;gap:12px}
+.op{border-left:5px solid var(--c)}
+.op h2{display:flex;align-items:center;justify-content:space-between;font-size:1rem;margin:0 0 4px;color:var(--c)}
+.op h2 button{min-height:30px;padding:2px 10px;font-size:.8rem}
+.row{display:grid;grid-template-columns:28px 1fr 52px;align-items:center;gap:8px}
+.row output{text-align:right;font:.85rem ui-monospace,Menlo,monospace;color:var(--mute)}
+input[type=range]{width:100%;height:34px;accent-color:var(--c)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.g2 select,.g2 button{width:100%}
+h3{margin:12px 0 6px;font-size:.9rem;color:var(--mute)}
+.f{font:600 1rem ui-monospace,Menlo,monospace;margin:4px 0 8px}
+.mm{display:inline-grid;grid-template-columns:repeat(3,auto);gap:2px 8px;font:.75rem ui-monospace,Menlo,monospace;text-align:right;padding:3px 7px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);border-radius:6px}
+.mm.big{font-size:.95rem;gap:4px 12px;padding:6px 12px;border-width:3px}
+.mrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:3px 0 10px}
+.hint{color:var(--mute);font-size:.82rem;margin:6px 0 0}
+details{margin-top:10px}summary{cursor:pointer;color:var(--mute);font-size:.9rem}
+table{width:100%;border-collapse:collapse;font:.8rem ui-monospace,Menlo,monospace}
+td,th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+.mg{display:inline-grid;grid-template-columns:repeat(3,64px);gap:4px}.mg .mi{width:64px;padding:6px;min-height:36px;text-align:center;cursor:text}.mg .fx{opacity:.5;text-align:center;padding:6px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-bottom:10px}.tile{padding:8px 6px;font-weight:600;font-size:.88rem}.tile.on{background:var(--final);color:#fff;border-color:var(--final)}#shape{display:none}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&quot;app&quot;&gt;
+&lt;header&gt;&lt;h1&gt;Transformation Visualizer&lt;/h1&gt;&lt;p&gt;Galawin ang sliders, i-drag ang shape, o mag-challenge. Tingnan kung paano nabubuo ang matrix.&lt;/p&gt;&lt;/header&gt;
+&lt;div class=&quot;layout&quot;&gt;
+&lt;section class=&quot;stage&quot;&gt;
+  &lt;canvas id=&quot;cv&quot; aria-label=&quot;Coordinate plane with original and transformed shape&quot;&gt;&lt;/canvas&gt;
+  &lt;div class=&quot;bar&quot;&gt;&lt;button class=&quot;go&quot; id=&quot;play&quot;&gt;▶ Play steps&lt;/button&gt;&lt;button id=&quot;reset&quot;&gt;Reset&lt;/button&gt;&lt;label class=&quot;sw&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;steps&quot; checked&gt; Show steps&lt;/label&gt;&lt;/div&gt;
+  &lt;div class=&quot;chips&quot; id=&quot;chips&quot;&gt;&lt;/div&gt;
+  &lt;p class=&quot;goal&quot; id=&quot;goalmsg&quot;&gt;&lt;/p&gt;&lt;p class=&quot;sum&quot; id=&quot;sum&quot; aria-live=&quot;polite&quot;&gt;&lt;/p&gt;
+&lt;/section&gt;
+&lt;div class=&quot;panel&quot;&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cT)&quot;&gt;&lt;h2&gt;Move &lt;button data-reset=&quot;T&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;X&lt;/span&gt;&lt;input id=&quot;tx&quot; type=&quot;range&quot; min=&quot;-6&quot; max=&quot;6&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Y&lt;/span&gt;&lt;input id=&quot;ty&quot; type=&quot;range&quot; min=&quot;-6&quot; max=&quot;6&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;&lt;/section&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cS)&quot;&gt;&lt;h2&gt;Scale &lt;button data-reset=&quot;S&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;X&lt;/span&gt;&lt;input id=&quot;sx&quot; type=&quot;range&quot; min=&quot;-3&quot; max=&quot;3&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Y&lt;/span&gt;&lt;input id=&quot;sy&quot; type=&quot;range&quot; min=&quot;-3&quot; max=&quot;3&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;label class=&quot;sw&quot; style=&quot;margin:0&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;lock&quot; checked&gt; Keep X and Y equal&lt;/label&gt;&lt;/section&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cH)&quot;&gt;&lt;h2&gt;Shear &lt;button data-reset=&quot;H&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;X&lt;/span&gt;&lt;input id=&quot;hx&quot; type=&quot;range&quot; min=&quot;-2&quot; max=&quot;2&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Y&lt;/span&gt;&lt;input id=&quot;hy&quot; type=&quot;range&quot; min=&quot;-2&quot; max=&quot;2&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;&lt;/section&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cR)&quot;&gt;&lt;h2&gt;Rotate &lt;button data-reset=&quot;R&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;°&lt;/span&gt;&lt;input id=&quot;r&quot; type=&quot;range&quot; min=&quot;-360&quot; max=&quot;360&quot; step=&quot;1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;&lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h3 style=&quot;margin-top:0&quot;&gt;Choose object&lt;/h3&gt;
+    &lt;div class=&quot;tiles&quot; id=&quot;tiles&quot;&gt;&lt;/div&gt;
+    &lt;div class=&quot;g2&quot;&gt;
+      &lt;select id=&quot;shape&quot; aria-label=&quot;Shape&quot;&gt;&lt;option value=&quot;F&quot;&gt;Shape: F&lt;/option&gt;&lt;option value=&quot;sq&quot;&gt;Shape: Square&lt;/option&gt;&lt;option value=&quot;tri&quot;&gt;Shape: Triangle&lt;/option&gt;&lt;option value=&quot;arrow&quot;&gt;Shape: Arrow&lt;/option&gt;&lt;option value=&quot;house&quot;&gt;Shape: House&lt;/option&gt;&lt;option value=&quot;star&quot;&gt;Shape: Star&lt;/option&gt;&lt;option value=&quot;L&quot;&gt;Shape: L&lt;/option&gt;&lt;option value=&quot;custom&quot;&gt;Shape: My drawing&lt;/option&gt;&lt;/select&gt;
+      &lt;button id=&quot;draw&quot;&gt;✎ Draw own shape&lt;/button&gt;
+      &lt;select id=&quot;pivot&quot; aria-label=&quot;Pivot&quot;&gt;&lt;option value=&quot;o&quot;&gt;Pivot: Origin (0,0)&lt;/option&gt;&lt;option value=&quot;c&quot;&gt;Pivot: Shape center&lt;/option&gt;&lt;option value=&quot;x&quot;&gt;Pivot: Custom (drag red dot)&lt;/option&gt;&lt;/select&gt;
+      &lt;select id=&quot;order&quot; aria-label=&quot;Order of operations&quot;&gt;&lt;/select&gt;
+    &lt;/div&gt;
+    &lt;h3&gt;Quick presets&lt;/h3&gt;&lt;div class=&quot;chips&quot; id=&quot;presets&quot; style=&quot;margin-top:0&quot;&gt;&lt;/div&gt;
+    &lt;h3&gt;Challenge&lt;/h3&gt;
+    &lt;div class=&quot;g2&quot;&gt;&lt;select id=&quot;lvl&quot; aria-label=&quot;Level&quot;&gt;&lt;option value=&quot;1&quot;&gt;Easy: move only&lt;/option&gt;&lt;option value=&quot;2&quot;&gt;Medium: move + rotate&lt;/option&gt;&lt;option value=&quot;3&quot;&gt;Hard: move + rotate + scale&lt;/option&gt;&lt;/select&gt;
+    &lt;button id=&quot;chal&quot;&gt;🎯 Start challenge&lt;/button&gt;&lt;/div&gt;
+    &lt;p class=&quot;hint&quot;&gt;Itugma ang asul na shape sa berdeng outline.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h3 style=&quot;margin-top:0&quot;&gt;Combined matrix M&lt;/h3&gt;
+    &lt;div class=&quot;f&quot; id=&quot;formula&quot;&gt;&lt;/div&gt;&lt;div class=&quot;mm big&quot; id=&quot;mat&quot;&gt;&lt;/div&gt;
+    &lt;p class=&quot;hint&quot;&gt;[x′ y′ 1]ᵀ = M · [x y 1]ᵀ. Ang unang operation ay nasa pinakakanan.&lt;/p&gt;
+    &lt;details&gt;&lt;summary&gt;Matrix math, step by step&lt;/summary&gt;&lt;div id=&quot;math&quot; style=&quot;margin-top:8px&quot;&gt;&lt;/div&gt;&lt;/details&gt;
+    &lt;details&gt;&lt;summary&gt;Vertex coordinates&lt;/summary&gt;&lt;table id=&quot;tbl&quot;&gt;&lt;/table&gt;&lt;/details&gt;
+    &lt;div class=&quot;g2&quot; style=&quot;margin-top:12px&quot;&gt;&lt;button id=&quot;png&quot;&gt;⬇ Save PNG&lt;/button&gt;&lt;button id=&quot;copy&quot;&gt;⧉ Copy matrix&lt;/button&gt;&lt;/div&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h3 style=&quot;margin-top:0&quot;&gt;Your own matrix&lt;/h3&gt;
+    &lt;label class=&quot;sw&quot; style=&quot;margin:0 0 8px&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;usemat&quot;&gt; Use this instead of the sliders&lt;/label&gt;
+    &lt;div class=&quot;mg&quot; id=&quot;mg&quot;&gt;&lt;/div&gt;
+    &lt;div class=&quot;g2&quot; style=&quot;margin-top:8px&quot;&gt;&lt;button id=&quot;fill&quot;&gt;Copy current M here&lt;/button&gt;&lt;/div&gt;
+    &lt;p class=&quot;hint&quot;&gt;Last row ay laging 0 0 1. Subukan: a=1, b=1 para sa shear.&lt;/p&gt;
+  &lt;/section&gt;
+&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;script&gt;
+const $=id=&gt;document.getElementById(id);
+const OFF=[2,1],NAME={S:&#x27;Scale&#x27;,H:&#x27;Shear&#x27;,R:&#x27;Rotate&#x27;,T:&#x27;Move&#x27;,M:&#x27;Matrix&#x27;};
+const SHAPES={
+  F:[[-1,-1.5],[-.4,-1.5],[-.4,-.2],[.5,-.2],[.5,.3],[-.4,.3],[-.4,.8],[.8,.8],[.8,1.5],[-1,1.5]],
+  sq:[[-1,-1],[1,-1],[1,1],[-1,1]],tri:[[-1,-1],[1,-1],[0,1.3]],
+  arrow:[[-1.2,-.4],[.3,-.4],[.3,-1],[1.3,0],[.3,1],[.3,.4],[-1.2,.4]]};
+SHAPES.house=[[-1,-1],[1,-1],[1,.4],[0,1.4],[-1,.4]];
+SHAPES.star=[...Array(10)].map((_,i)=&gt;{const a=Math.PI/2+i*Math.PI/5,r=i%2?.55:1.3;return[r*Math.cos(a),r*Math.sin(a)]});
+SHAPES.L=[[-1,-1.2],[1,-1.2],[1,-.2],[-.1,-.2],[-.1,1.2],[-1,1.2]];
+for(const k in SHAPES)SHAPES[k]=SHAPES[k].map(v=&gt;[v[0]+OFF[0],v[1]+OFF[1]]);
+const ID={tx:0,ty:0,sx:1,sy:1,hx:0,hy:0,r:0};
+const PRESETS=[[&#x27;Flip left–right&#x27;,{sx:-1,sy:1}],[&#x27;Flip up–down&#x27;,{sx:1,sy:-1}],[&#x27;Turn 90°&#x27;,{r:90}],[&#x27;Double&#x27;,{sx:2,sy:2}],[&#x27;Half&#x27;,{sx:.5,sy:.5}],[&#x27;Shear →&#x27;,{hx:.6}]];
+const perms=s=&gt;s.length&lt;2?[s]:[...s].flatMap((c,i)=&gt;perms(s.slice(0,i)+s.slice(i+1)).map(p=&gt;c+p));
+const cv=$(&#x27;cv&#x27;),ctx=cv.getContext(&#x27;2d&#x27;),ids=Object.keys(ID);
+let P={...ID,tx:1,ty:-2,sx:1.3,sy:1.3,r:30},prog=null,raf=null,goal=null,drawing=false,cust=[],cp=[0,0];
+const col=c=&gt;getComputedStyle(document.documentElement).getPropertyValue(c).trim();
+const clamp=(v,a,b)=&gt;Math.min(b,Math.max(a,v));
+const mul=(A,B)=&gt;A.map((_,i)=&gt;B[0].map((_,j)=&gt;A[i][0]*B[0][j]+A[i][1]*B[1][j]+A[i][2]*B[2][j]));
+const Tm=(x,y)=&gt;[[1,0,x],[0,1,y],[0,0,1]],I3=()=&gt;Tm(0,0);
+const apply=(M,v)=&gt;[M[0][0]*v[0]+M[0][1]*v[1]+M[0][2],M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]];
+const fmt=n=&gt;(Math.abs(n)&lt;.005?0:n).toFixed(2);
+const useMat=()=&gt;$(&#x27;usemat&#x27;).checked;
+const ordArr=()=&gt;useMat()?[&#x27;M&#x27;]:[...$(&#x27;order&#x27;).value];
+const pivot=()=&gt;{const m=$(&#x27;pivot&#x27;).value;return m===&#x27;o&#x27;?[0,0]:m===&#x27;c&#x27;?OFF:cp};
+const base=()=&gt;{const s=$(&#x27;shape&#x27;).value;return s===&#x27;custom&#x27;?(cust.length&gt;=3?cust:SHAPES.F):SHAPES[s]};
+const userMat=()=&gt;{const v=[...document.querySelectorAll(&#x27;.mi&#x27;)].map(i=&gt;+i.value||0);return[[v[0],v[1],v[2]],[v[3],v[4],v[5]],[0,0,1]]};
+function mats(p){
+  const a=p.r*Math.PI/180,c=Math.cos(a),s=Math.sin(a),[qx,qy]=pivot(),ab=M=&gt;mul(Tm(qx,qy),mul(M,Tm(-qx,-qy)));
+  return{T:Tm(p.tx,p.ty),S:ab([[p.sx,0,0],[0,p.sy,0],[0,0,1]]),H:ab([[1,p.hx,0],[p.hy,1,0],[0,0,1]]),R:ab([[c,-s,0],[s,c,0],[0,0,1]])};
+}
+function stages(p){
+  if(useMat()){const M=userMat();return[{ch:&#x27;M&#x27;,M,op:M,prev:I3()}]}
+  const m=mats(p);let M=I3();
+  return[...$(&#x27;order&#x27;).value].map(ch=&gt;{const prev=M;M=mul(m[ch],M);return{ch,M,op:m[ch],prev}});
+}
+function view(){
+  if(prog===null)return P;
+  const q={...ID};
+  ordArr().forEach((ch,k)=&gt;{const f=clamp(prog-k,0,1);
+    if(ch===&#x27;T&#x27;){q.tx=P.tx*f;q.ty=P.ty*f}
+    if(ch===&#x27;S&#x27;){q.sx=1+(P.sx-1)*f;q.sy=1+(P.sy-1)*f}
+    if(ch===&#x27;H&#x27;){q.hx=P.hx*f;q.hy=P.hy*f}
+    if(ch===&#x27;R&#x27;)q.r=P.r*f});
+  return q;
+}
+function fit(){const d=devicePixelRatio||1,w=cv.clientWidth;cv.width=w*d;cv.height=w*d;ctx.setTransform(d,0,0,d,0,0);draw()}
+const mh=(M,cls=&#x27;&#x27;)=&gt;`&lt;span class=&quot;mm ${cls}&quot;&gt;${M.flat().map(n=&gt;`&lt;span&gt;${fmt(n)}&lt;/span&gt;`).join(&#x27;&#x27;)}&lt;/span&gt;`;
+function draw(){
+  const W=cv.clientWidth,u=W/16,X=x=&gt;W/2+x*u,Y=y=&gt;W/2-y*u;
+  ctx.clearRect(0,0,W,W);ctx.font=&#x27;11px system-ui&#x27;;
+  for(let i=-8;i&lt;=8;i++){
+    ctx.strokeStyle=i?col(&#x27;--grid&#x27;):col(&#x27;--axis&#x27;);ctx.lineWidth=i?1:1.5;
+    ctx.beginPath();ctx.moveTo(X(i),0);ctx.lineTo(X(i),W);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,Y(i));ctx.lineTo(W,Y(i));ctx.stroke();
+    if(i&amp;&amp;i%2===0){ctx.fillStyle=col(&#x27;--mute&#x27;);ctx.fillText(i,X(i)-3,Y(0)+13);ctx.fillText(i,X(0)+4,Y(i)+4)}
+  }
+  const path=pts=&gt;{ctx.beginPath();pts.forEach((p,i)=&gt;i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.closePath()};
+  ctx.lineJoin=&#x27;round&#x27;;
+  if(drawing){
+    ctx.strokeStyle=col(&#x27;--final&#x27;);ctx.lineWidth=2;ctx.beginPath();cust.forEach((p,i)=&gt;i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.stroke();
+    ctx.fillStyle=col(&#x27;--final&#x27;);cust.forEach(p=&gt;{ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),4,0,7);ctx.fill()});
+    $(&#x27;sum&#x27;).textContent=`Draw mode: tap the grid to add points (${cust.length}). Kailangan ng 3 o higit pa.`;return;
+  }
+  const b=base(),st=stages(view()),n=st.length;
+  if(goal){ctx.setLineDash([2,4]);ctx.strokeStyle=col(&#x27;--goal&#x27;);ctx.lineWidth=3;path(goal);ctx.stroke()}
+  ctx.setLineDash([6,5]);ctx.strokeStyle=col(&#x27;--orig&#x27;);ctx.lineWidth=1.5;path(b);ctx.stroke();ctx.setLineDash([]);
+  if($(&#x27;steps&#x27;).checked&amp;&amp;n&gt;1)st.slice(0,-1).forEach((s,k)=&gt;{
+    const c=col(&#x27;--c&#x27;+s.ch),pts=b.map(v=&gt;apply(s.M,v));
+    ctx.globalAlpha=.6;ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.setLineDash([3,3]);path(pts);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=c;ctx.font=&#x27;600 11px system-ui&#x27;;ctx.fillText(`${k+1}. ${NAME[s.ch]}`,X(pts[0][0])+6,Y(pts[0][1])-6);ctx.globalAlpha=1});
+  const M=st[n-1].M,out=b.map(v=&gt;apply(M,v));
+  path(out);ctx.fillStyle=col(&#x27;--final&#x27;);ctx.globalAlpha=.2;ctx.fill();ctx.globalAlpha=1;
+  ctx.strokeStyle=col(&#x27;--final&#x27;);ctx.lineWidth=2.5;ctx.stroke();
+  ctx.fillStyle=col(&#x27;--final&#x27;);out.forEach(p=&gt;{ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),3,0,7);ctx.fill()});
+  const pv=pivot();ctx.fillStyle=col(&#x27;--pivot&#x27;);ctx.beginPath();ctx.arc(X(pv[0]),Y(pv[1]),5.5,0,7);ctx.fill();
+  ctx.strokeStyle=col(&#x27;--panel&#x27;);ctx.lineWidth=2;ctx.stroke();
+  // challenge score (min over cyclic vertex shifts)
+  if(goal){let best=99;const k=out.length;
+    for(let s=0;s&lt;k;s++){let d=0;for(let i=0;i&lt;k;i++)d+=Math.hypot(out[i][0]-goal[(i+s)%k][0],out[i][1]-goal[(i+s)%k][1]);best=Math.min(best,d/k)}
+    $(&#x27;goalmsg&#x27;).textContent=best&lt;.2?&#x27;🎯 Solved! Pindutin ang Start para sa bago.&#x27;:`Match: ${Math.max(0,Math.round(100-best*20))}%`}
+  else $(&#x27;goalmsg&#x27;).textContent=&#x27;&#x27;;
+  // matrix panels
+  $(&#x27;mat&#x27;).innerHTML=M.flat().map(x=&gt;`&lt;span&gt;${fmt(x)}&lt;/span&gt;`).join(&#x27;&#x27;);
+  $(&#x27;formula&#x27;).innerHTML=&#x27;M = &#x27;+[...ordArr()].reverse().map(c=&gt;`&lt;span style=&quot;color:var(--c${c})&quot;&gt;${c}&lt;/span&gt;`).join(&#x27; · &#x27;);
+  $(&#x27;math&#x27;).innerHTML=st.map((s,i)=&gt;`&lt;div style=&quot;color:var(--c${s.ch});font-weight:600;font-size:.85rem&quot;&gt;${i+1}. ${NAME[s.ch]}&lt;/div&gt;&lt;div class=&quot;mrow&quot;&gt;${mh(s.op)} × ${mh(s.prev)} = ${mh(s.M)}&lt;/div&gt;`).join(&#x27;&#x27;);
+  $(&#x27;tbl&#x27;).innerHTML=&#x27;&lt;tr&gt;&lt;th&gt;Vertex&lt;/th&gt;&lt;th&gt;Before&lt;/th&gt;&lt;th&gt;After&lt;/th&gt;&lt;/tr&gt;&#x27;+b.map((v,i)=&gt;`&lt;tr&gt;&lt;td&gt;V${i+1}&lt;/td&gt;&lt;td&gt;(${fmt(v[0])}, ${fmt(v[1])})&lt;/td&gt;&lt;td&gt;(${fmt(out[i][0])}, ${fmt(out[i][1])})&lt;/td&gt;&lt;/tr&gt;`).join(&#x27;&#x27;);
+}
+function ui(){
+  ids.forEach(id=&gt;{$(id).value=P[id];$(id).nextElementSibling.textContent=id===&#x27;r&#x27;?Math.round(P[id])+&#x27;°&#x27;:(+P[id]).toFixed(1)});
+  const o=ordArr(),on=prog===null?-1:Math.min(o.length-1,Math.floor(prog));
+  $(&#x27;chips&#x27;).innerHTML=o.map((c,i)=&gt;`&lt;span class=&quot;chip ${i===on?&#x27;on&#x27;:&#x27;&#x27;}&quot; style=&quot;--c:var(--c${c})&quot;&gt;${i+1}. ${NAME[c]}&lt;/span&gt;`).join(&#x27;&#x27;);
+  if(drawing)return;
+  const t={S:`scale ${P.sx.toFixed(1)}×/${P.sy.toFixed(1)}×`,H:`shear (${P.hx.toFixed(1)}, ${P.hy.toFixed(1)})`,R:`rotate ${Math.round(P.r)}°`,T:`move (${P.tx.toFixed(1)}, ${P.ty.toFixed(1)})`};
+  const idn={S:P.sx===1&amp;&amp;P.sy===1,H:!P.hx&amp;&amp;!P.hy,R:!P.r,T:!P.tx&amp;&amp;!P.ty};
+  const parts=o.filter(c=&gt;c!==&#x27;M&#x27;&amp;&amp;!idn[c]).map(c=&gt;t[c]);
+  $(&#x27;sum&#x27;).textContent=useMat()?&#x27;Gamit ang sarili mong matrix.&#x27;:parts.length?&#x27;Ginagawa: &#x27;+parts.join(&#x27;, then &#x27;)+&#x27;.&#x27;:&#x27;Walang transformation pa. Galawin ang sliders o i-drag ang shape.&#x27;;
+}
+const refresh=()=&gt;{ui();draw()};
+function stop(){if(raf)cancelAnimationFrame(raf);raf=null;prog=null;$(&#x27;play&#x27;).textContent=&#x27;▶ Play steps&#x27;}
+const change=()=&gt;{stop();refresh()};
+
+ids.forEach(id=&gt;$(id).addEventListener(&#x27;input&#x27;,()=&gt;{P[id]=+$(id).value;if($(&#x27;lock&#x27;).checked&amp;&amp;(id===&#x27;sx&#x27;||id===&#x27;sy&#x27;))P.sx=P.sy=P[id];change()}));
+document.querySelectorAll(&#x27;[data-reset]&#x27;).forEach(b=&gt;b.onclick=()=&gt;{
+  const k=b.dataset.reset;
+  if(k===&#x27;T&#x27;)Object.assign(P,{tx:0,ty:0});if(k===&#x27;S&#x27;)Object.assign(P,{sx:1,sy:1});if(k===&#x27;H&#x27;)Object.assign(P,{hx:0,hy:0});if(k===&#x27;R&#x27;)P.r=0;change()});
+$(&#x27;reset&#x27;).onclick=()=&gt;{P={...ID};change()};
+[&#x27;shape&#x27;,&#x27;order&#x27;,&#x27;pivot&#x27;,&#x27;steps&#x27;,&#x27;usemat&#x27;].forEach(i=&gt;$(i).onchange=change);
+$(&#x27;lock&#x27;).onchange=()=&gt;{if($(&#x27;lock&#x27;).checked){P.sy=P.sx;change()}};
+perms(&#x27;SHRT&#x27;).forEach(o=&gt;{const e=document.createElement(&#x27;option&#x27;);e.value=o;e.textContent=&#x27;Order: &#x27;+[...o].map(c=&gt;NAME[c]).join(&#x27; → &#x27;);$(&#x27;order&#x27;).appendChild(e)});
+PRESETS.forEach(([n,v])=&gt;{const b=document.createElement(&#x27;button&#x27;);b.className=&#x27;chip&#x27;;b.style.setProperty(&#x27;--c&#x27;,&#x27;var(--mute)&#x27;);b.textContent=n;b.onclick=()=&gt;{Object.assign(P,v);change()};$(&#x27;presets&#x27;).appendChild(b)});
+// own-matrix grid
+[1,0,0,0,1,0].forEach((v,i)=&gt;{const e=document.createElement(&#x27;input&#x27;);e.className=&#x27;mi&#x27;;e.type=&#x27;number&#x27;;e.step=&#x27;0.1&#x27;;e.value=v;e.setAttribute(&#x27;aria-label&#x27;,&#x27;matrix cell &#x27;+i);e.oninput=change;$(&#x27;mg&#x27;).appendChild(e)});
+[0,0,1].forEach(v=&gt;{const e=document.createElement(&#x27;span&#x27;);e.className=&#x27;mi fx&#x27;;e.textContent=v;$(&#x27;mg&#x27;).appendChild(e)});
+$(&#x27;fill&#x27;).onclick=()=&gt;{const m=mats(P);let M=I3();for(const c of $(&#x27;order&#x27;).value)M=mul(m[c],M);
+  document.querySelectorAll(&#x27;.mi&#x27;).forEach((e,i)=&gt;e.value=+fmt(M[Math.floor(i/3)][i%3]));change()};
+// play
+$(&#x27;play&#x27;).onclick=()=&gt;{
+  if(raf){stop();refresh();return}
+  const t0=performance.now(),D=1500,N=ordArr().length;$(&#x27;play&#x27;).textContent=&#x27;■ Stop&#x27;;
+  const tick=now=&gt;{const t=(now-t0)/D;if(t&gt;=N){stop();refresh();return}prog=t;ui();draw();raf=requestAnimationFrame(tick)};
+  raf=requestAnimationFrame(tick);
+};
+// challenge
+$(&#x27;chal&#x27;).onclick=()=&gt;{
+  stop();const L=+$(&#x27;lvl&#x27;).value,ri=(a,b)=&gt;a+Math.floor(Math.random()*(b-a+1)),pick=a=&gt;a[ri(0,a.length-1)];
+  const T={...ID,tx:ri(-4,4)||2,ty:ri(-4,4)||-2};
+  if(L&gt;=2)T.r=pick([-120,-90,-60,-45,45,60,90,120,150]);
+  if(L&gt;=3){T.sx=T.sy=pick([.5,.75,1.5,2])}
+  const M=(()=&gt;{const m=mats(T);let X=I3();for(const c of $(&#x27;order&#x27;).value)X=mul(m[c],X);return X})();
+  goal=base().map(v=&gt;apply(M,v));P={...ID};
+  if(useMat())$(&#x27;usemat&#x27;).checked=false;change();
+};
+// export
+$(&#x27;png&#x27;).onclick=()=&gt;cv.toBlob(b=&gt;{const a=document.createElement(&#x27;a&#x27;);a.href=URL.createObjectURL(b);a.download=&#x27;transformation.png&#x27;;a.click()});
+$(&#x27;copy&#x27;).onclick=async()=&gt;{const M=stages(P).pop().M,t=M.map(r=&gt;r.map(fmt).join(&#x27;  &#x27;)).join(&#x27;\n&#x27;);
+  try{await navigator.clipboard.writeText(t);$(&#x27;copy&#x27;).textContent=&#x27;✓ Copied&#x27;}catch(e){$(&#x27;copy&#x27;).textContent=&#x27;Hindi ma-copy&#x27;}setTimeout(()=&gt;$(&#x27;copy&#x27;).textContent=&#x27;⧉ Copy matrix&#x27;,1500)};
+// draw own shape
+$(&#x27;draw&#x27;).onclick=()=&gt;{drawing=!drawing;
+  if(drawing){cust=[];$(&#x27;shape&#x27;).value=&#x27;custom&#x27;;stop()}
+  $(&#x27;draw&#x27;).textContent=drawing?&#x27;✔ Done drawing&#x27;:&#x27;✎ Draw own shape&#x27;;
+  if(drawing&amp;&amp;false)return;refresh();if(!drawing&amp;&amp;cust.length&lt;3)$(&#x27;sum&#x27;).textContent=&#x27;Kulang ang points, kaya F muna ang gamit.&#x27;};
+// pointer: draw points / drag pivot / drag shape
+let last=null,dragPv=false;
+const world=e=&gt;{const r=cv.getBoundingClientRect(),W=r.width,u=W/16;return[(e.clientX-r.left-W/2)/u,-(e.clientY-r.top-W/2)/u]};
+cv.addEventListener(&#x27;pointerdown&#x27;,e=&gt;{
+  const w=world(e);
+  if(drawing){cust.push([Math.round(w[0]*2)/2,Math.round(w[1]*2)/2]);draw();return}
+  stop();const pv=pivot(),u=cv.clientWidth/16;
+  dragPv=$(&#x27;pivot&#x27;).value===&#x27;x&#x27;&amp;&amp;Math.hypot(w[0]-pv[0],w[1]-pv[1])*u&lt;18;
+  last=[e.clientX,e.clientY];cv.setPointerCapture(e.pointerId);cv.style.cursor=&#x27;grabbing&#x27;});
+cv.addEventListener(&#x27;pointermove&#x27;,e=&gt;{
+  if(!last)return;const u=cv.clientWidth/16,dx=(e.clientX-last[0])/u,dy=-(e.clientY-last[1])/u;last=[e.clientX,e.clientY];
+  if(dragPv){const w=world(e);cp=[Math.round(clamp(w[0],-8,8)*10)/10,Math.round(clamp(w[1],-8,8)*10)/10]}
+  else{P.tx=Math.round(clamp(P.tx+dx,-6,6)*10)/10;P.ty=Math.round(clamp(P.ty+dy,-6,6)*10)/10}
+  refresh()});
+[&#x27;pointerup&#x27;,&#x27;pointercancel&#x27;].forEach(ev=&gt;cv.addEventListener(ev,()=&gt;{last=null;dragPv=false;cv.style.cursor=&#x27;grab&#x27;}));
+addEventListener(&#x27;resize&#x27;,fit);
+matchMedia(&#x27;(prefers-color-scheme:dark)&#x27;).addEventListener(&#x27;change&#x27;,draw);
+const tiles=document.getElementById(&#x27;tiles&#x27;);
+function buildTiles(){tiles.innerHTML=&#x27;&#x27;;[...$(&#x27;shape&#x27;).options].forEach(o=&gt;{const b=document.createElement(&#x27;button&#x27;);b.className=&#x27;tile&#x27;+(o.value===$(&#x27;shape&#x27;).value?&#x27; on&#x27;:&#x27;&#x27;);b.textContent=o.text.replace(&#x27;Shape: &#x27;,&#x27;&#x27;);b.setAttribute(&#x27;aria-pressed&#x27;,o.value===$(&#x27;shape&#x27;).value);b.onclick=()=&gt;{$(&#x27;shape&#x27;).value=o.value;$(&#x27;shape&#x27;).dispatchEvent(new Event(&#x27;change&#x27;))};tiles.appendChild(b)})}
+$(&#x27;shape&#x27;).addEventListener(&#x27;change&#x27;,buildTiles);buildTiles();
+$(&#x27;draw&#x27;).addEventListener(&#x27;click&#x27;,buildTiles);
+ui();fit();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+<iframe id="f3" class="off" title="3D transformation visualizer" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;title&gt;3D Transformation Visualizer&lt;/title&gt;
+&lt;style&gt;
+:root{--bg:#eef1f8;--panel:#fff;--ink:#1b2236;--mute:#5f6b85;--line:#d8deec;--grid:#d5dbea;--orig:#8d99b5;--final:#2563eb;--face:#f59e0b;--cS:#7c3aed;--cR:#d97706;--cT:#0d9488;--pivot:#e11d48}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1424;--panel:#182038;--ink:#e8ecf8;--mute:#9aa6c6;--line:#2a3558;--grid:#2a3558;--orig:#6d7aa0;--final:#60a5fa;--face:#fbbf24;--cS:#a78bfa;--cR:#fbbf24;--cT:#2dd4bf;--pivot:#fb7185}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif}
+.app{max-width:980px;margin:0 auto;padding:0 14px 28px}
+header{padding:16px 2px 10px}h1{font-size:1.4rem;margin:0}header p{margin:2px 0 0;color:var(--mute);font-size:.92rem}
+.layout{display:grid;gap:14px}
+@media(min-width:800px){.layout{grid-template-columns:1fr 1fr;align-items:start}.stage{position:sticky;top:12px}}
+.card,.stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.stage{padding:10px}
+@media(max-width:799px){.stage{position:sticky;top:0;z-index:5;border-radius:0 0 14px 14px;margin:0 -14px;border-top:0}}
+canvas{display:block;width:min(100%,40vh);aspect-ratio:1;margin:0 auto;border-radius:10px;cursor:grab;touch-action:none;background:var(--bg)}
+@media(min-width:800px){canvas{width:100%}}
+.bar,.chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.chips{gap:6px}
+.sum{font-size:.86rem;color:var(--mute);margin:6px 2px 0}
+button,select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:40px;cursor:pointer}
+button.go{background:var(--final);border-color:var(--final);color:#fff;font-weight:600}
+:focus-visible{outline:3px solid var(--final);outline-offset:2px}
+.sw{display:flex;align-items:center;gap:6px;font-size:.88rem;cursor:pointer}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--final)}
+.chip{display:inline-flex;padding:3px 10px;border-radius:99px;font-size:.82rem;font-weight:600;border:2px solid var(--c);color:var(--c);min-height:0;background:transparent}
+.chip.on{background:var(--c);color:var(--panel)}
+.panel{display:grid;gap:12px}
+.op{border-left:5px solid var(--c)}
+.op h2{display:flex;align-items:center;justify-content:space-between;font-size:1rem;margin:0 0 4px;color:var(--c)}
+.op h2 button{min-height:30px;padding:2px 10px;font-size:.8rem}
+.row{display:grid;grid-template-columns:22px 1fr 52px;align-items:center;gap:8px}
+.row output{text-align:right;font:.85rem ui-monospace,Menlo,monospace;color:var(--mute)}
+input[type=range]{width:100%;height:32px;accent-color:var(--c,var(--final))}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.g2 select,.g2 button{width:100%}
+h3{margin:12px 0 6px;font-size:.9rem;color:var(--mute)}
+.f{font:600 1rem ui-monospace,Menlo,monospace;margin:4px 0 8px}
+.mm{display:inline-grid;grid-template-columns:repeat(4,auto);gap:2px 8px;font:.72rem ui-monospace,Menlo,monospace;text-align:right;padding:3px 7px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);border-radius:6px}
+.mm.big{font-size:.9rem;gap:4px 12px;padding:6px 12px;border-width:3px}
+.mrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:3px 0 10px}
+.hint{color:var(--mute);font-size:.82rem;margin:6px 0 0}
+details{margin-top:10px}summary{cursor:pointer;color:var(--mute);font-size:.9rem}
+table{width:100%;border-collapse:collapse;font:.78rem ui-monospace,Menlo,monospace}
+td,th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-bottom:10px}.tile{padding:8px 6px;font-weight:600;font-size:.88rem}.tile.on{background:var(--final);color:#fff;border-color:var(--final)}#shape{display:none}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&quot;app&quot;&gt;
+&lt;header&gt;&lt;h1&gt;3D Transformation Visualizer&lt;/h1&gt;&lt;p&gt;I-drag ang canvas para umikot ang view. Tingnan kung paano nabubuo ang 4×4 matrix.&lt;/p&gt;&lt;/header&gt;
+&lt;div class=&quot;layout&quot;&gt;
+&lt;section class=&quot;stage&quot;&gt;
+  &lt;canvas id=&quot;cv&quot; aria-label=&quot;3D view of the original and transformed shape&quot;&gt;&lt;/canvas&gt;
+  &lt;div class=&quot;bar&quot;&gt;&lt;button class=&quot;go&quot; id=&quot;play&quot;&gt;▶ Play steps&lt;/button&gt;&lt;button id=&quot;reset&quot;&gt;Reset&lt;/button&gt;&lt;button id=&quot;rview&quot;&gt;Reset view&lt;/button&gt;&lt;/div&gt;
+  &lt;div class=&quot;bar&quot;&gt;&lt;label class=&quot;sw&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;steps&quot; checked&gt; Steps&lt;/label&gt;&lt;label class=&quot;sw&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;persp&quot; checked&gt; Perspective&lt;/label&gt;
+    &lt;label class=&quot;sw&quot; style=&quot;margin-left:auto&quot;&gt;Zoom &lt;input id=&quot;zoom&quot; type=&quot;range&quot; min=&quot;7&quot; max=&quot;26&quot; step=&quot;0.5&quot; value=&quot;14&quot; style=&quot;width:90px&quot;&gt;&lt;/label&gt;&lt;/div&gt;
+  &lt;div class=&quot;chips&quot; id=&quot;chips&quot;&gt;&lt;/div&gt;&lt;p class=&quot;sum&quot; id=&quot;sum&quot; aria-live=&quot;polite&quot;&gt;&lt;/p&gt;
+&lt;/section&gt;
+&lt;div class=&quot;panel&quot;&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cT)&quot;&gt;&lt;h2&gt;Move &lt;button data-reset=&quot;T&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;X&lt;/span&gt;&lt;input id=&quot;tx&quot; type=&quot;range&quot; min=&quot;-6&quot; max=&quot;6&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Y&lt;/span&gt;&lt;input id=&quot;ty&quot; type=&quot;range&quot; min=&quot;-6&quot; max=&quot;6&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Z&lt;/span&gt;&lt;input id=&quot;tz&quot; type=&quot;range&quot; min=&quot;-6&quot; max=&quot;6&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;&lt;/section&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cS)&quot;&gt;&lt;h2&gt;Scale &lt;button data-reset=&quot;S&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;X&lt;/span&gt;&lt;input id=&quot;sx&quot; type=&quot;range&quot; min=&quot;-3&quot; max=&quot;3&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Y&lt;/span&gt;&lt;input id=&quot;sy&quot; type=&quot;range&quot; min=&quot;-3&quot; max=&quot;3&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Z&lt;/span&gt;&lt;input id=&quot;sz&quot; type=&quot;range&quot; min=&quot;-3&quot; max=&quot;3&quot; step=&quot;0.1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;label class=&quot;sw&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;lock&quot; checked&gt; Keep X, Y, Z equal&lt;/label&gt;&lt;/section&gt;
+  &lt;section class=&quot;card op&quot; style=&quot;--c:var(--cR)&quot;&gt;&lt;h2&gt;Rotate &lt;button data-reset=&quot;R&quot;&gt;Reset&lt;/button&gt;&lt;/h2&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;X°&lt;/span&gt;&lt;input id=&quot;rx&quot; type=&quot;range&quot; min=&quot;-180&quot; max=&quot;180&quot; step=&quot;1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Y°&lt;/span&gt;&lt;input id=&quot;ry&quot; type=&quot;range&quot; min=&quot;-180&quot; max=&quot;180&quot; step=&quot;1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;span&gt;Z°&lt;/span&gt;&lt;input id=&quot;rz&quot; type=&quot;range&quot; min=&quot;-180&quot; max=&quot;180&quot; step=&quot;1&quot;&gt;&lt;output&gt;&lt;/output&gt;&lt;/div&gt;
+    &lt;p class=&quot;hint&quot;&gt;Rotation matrix: R = Rz · Ry · Rx (X muna, tapos Y, tapos Z).&lt;/p&gt;&lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h3 style=&quot;margin-top:0&quot;&gt;Choose object&lt;/h3&gt;
+    &lt;div class=&quot;tiles&quot; id=&quot;tiles&quot;&gt;&lt;/div&gt;
+    &lt;div class=&quot;g2&quot;&gt;
+      &lt;select id=&quot;shape&quot; aria-label=&quot;Shape&quot;&gt;&lt;option value=&quot;block&quot;&gt;Shape: Block&lt;/option&gt;&lt;option value=&quot;pyr&quot;&gt;Shape: Pyramid&lt;/option&gt;&lt;option value=&quot;prism&quot;&gt;Shape: Prism&lt;/option&gt;&lt;option value=&quot;cube&quot;&gt;Shape: Cube&lt;/option&gt;&lt;option value=&quot;lblock&quot;&gt;Shape: L-block&lt;/option&gt;&lt;option value=&quot;stairs&quot;&gt;Shape: Stairs&lt;/option&gt;&lt;/select&gt;
+      &lt;select id=&quot;pivot&quot; aria-label=&quot;Pivot&quot;&gt;&lt;option value=&quot;o&quot;&gt;Pivot: Origin (0,0,0)&lt;/option&gt;&lt;option value=&quot;c&quot;&gt;Pivot: Shape center&lt;/option&gt;&lt;/select&gt;
+      &lt;select id=&quot;order&quot; aria-label=&quot;Order of operations&quot; style=&quot;grid-column:1/3&quot;&gt;&lt;/select&gt;
+    &lt;/div&gt;
+    &lt;h3&gt;Quick presets&lt;/h3&gt;&lt;div class=&quot;chips&quot; id=&quot;presets&quot; style=&quot;margin-top:0&quot;&gt;&lt;/div&gt;
+    &lt;p class=&quot;hint&quot;&gt;Ang kulay amber na face ang &quot;harap&quot; ng shape, para makita mo kung paano ito umiikot.&lt;/p&gt;
+  &lt;/section&gt;
+
+  &lt;section class=&quot;card&quot;&gt;
+    &lt;h3 style=&quot;margin-top:0&quot;&gt;Combined matrix M (4×4)&lt;/h3&gt;
+    &lt;div class=&quot;f&quot; id=&quot;formula&quot;&gt;&lt;/div&gt;&lt;div class=&quot;mm big&quot; id=&quot;mat&quot;&gt;&lt;/div&gt;
+    &lt;p class=&quot;hint&quot;&gt;[x′ y′ z′ 1]ᵀ = M · [x y z 1]ᵀ. Ang unang operation ay nasa pinakakanan.&lt;/p&gt;
+    &lt;details&gt;&lt;summary&gt;Matrix math, step by step&lt;/summary&gt;&lt;div id=&quot;math&quot; style=&quot;margin-top:8px&quot;&gt;&lt;/div&gt;&lt;/details&gt;
+    &lt;details&gt;&lt;summary&gt;Vertex coordinates&lt;/summary&gt;&lt;table id=&quot;tbl&quot;&gt;&lt;/table&gt;&lt;/details&gt;
+    &lt;div class=&quot;g2&quot; style=&quot;margin-top:12px&quot;&gt;&lt;button id=&quot;png&quot;&gt;⬇ Save PNG&lt;/button&gt;&lt;button id=&quot;copy&quot;&gt;⧉ Copy matrix&lt;/button&gt;&lt;/div&gt;
+  &lt;/section&gt;
+&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;script&gt;
+const $=id=&gt;document.getElementById(id);
+const OFF=[2,0,0],NAME={S:&#x27;Scale&#x27;,R:&#x27;Rotate&#x27;,T:&#x27;Move&#x27;},AX=[[&#x27;X&#x27;,&#x27;#ef4444&#x27;,[6,0,0]],[&#x27;Y&#x27;,&#x27;#22c55e&#x27;,[0,6,0]],[&#x27;Z&#x27;,&#x27;#3b82f6&#x27;,[0,0,6]]];
+const box=(a,b,c)=&gt;[...Array(8)].map((_,i)=&gt;[(i&amp;1?1:-1)*a,(i&amp;2?1:-1)*b,(i&amp;4?1:-1)*c]);
+const SH={
+  block:{v:box(1,.6,.8),f:[[4,5,7,6],[0,1,3,2],[0,2,6,4],[1,3,7,5],[0,1,5,4],[2,3,7,6]]},
+  pyr:{v:[[-1,-.8,-1],[1,-.8,-1],[1,-.8,1],[-1,-.8,1],[0,1,0]],f:[[2,3,4],[0,1,4],[1,2,4],[3,0,4],[0,1,2,3]]},
+  prism:{v:[[-1,-.7,-.8],[1,-.7,-.8],[0,.9,-.8],[-1,-.7,.8],[1,-.7,.8],[0,.9,.8]],f:[[3,4,5],[0,1,2],[0,1,4,3],[0,2,5,3],[1,2,5,4]]}
+};
+const bx=(x0,x1,y0,y1,z0,z1)=&gt;[...Array(8)].map((_,i)=&gt;[i&amp;1?x1:x0,i&amp;2?y1:y0,i&amp;4?z1:z0]);
+const join=(...bs)=&gt;({v:bs.flat(),f:bs.flatMap((_,k)=&gt;SH.block.f.map(f=&gt;f.map(i=&gt;i+8*k)))});
+SH.cube={v:box(.9,.9,.9),f:SH.block.f};
+SH.lblock=join(bx(-1,1,-1,-.3,-.7,.7),bx(-1,-.3,-.3,1,-.7,.7));
+SH.stairs=join(bx(-1,1,-1,-.35,-.7,.7),bx(-.35,1,-.35,.3,-.7,.7),bx(.3,1,.3,.95,-.7,.7));
+for(const k in SH)SH[k].v=SH[k].v.map(v=&gt;[v[0]+OFF[0],v[1]+OFF[1],v[2]+OFF[2]]);
+const ID={tx:0,ty:0,tz:0,sx:1,sy:1,sz:1,rx:0,ry:0,rz:0},ids=Object.keys(ID);
+const PRESETS=[[&#x27;Turn 90° X&#x27;,{rx:90}],[&#x27;Turn 90° Y&#x27;,{ry:90}],[&#x27;Turn 90° Z&#x27;,{rz:90}],[&#x27;Double&#x27;,{sx:2,sy:2,sz:2}],[&#x27;Half&#x27;,{sx:.5,sy:.5,sz:.5}],[&#x27;Flip X&#x27;,{sx:-1,sy:1,sz:1}]];
+const perms=s=&gt;s.length&lt;2?[s]:[...s].flatMap((c,i)=&gt;perms(s.slice(0,i)+s.slice(i+1)).map(p=&gt;c+p));
+const cv=$(&#x27;cv&#x27;),ctx=cv.getContext(&#x27;2d&#x27;);
+let P={...ID,tx:-2,ty:1,tz:1,sx:1.3,sy:1.3,sz:1.3,rx:20,ry:40},prog=null,raf=null,yaw=-.6,pitch=.45;
+const col=c=&gt;getComputedStyle(document.documentElement).getPropertyValue(c).trim();
+const clamp=(v,a,b)=&gt;Math.min(b,Math.max(a,v));
+const mul=(A,B)=&gt;A.map((_,i)=&gt;B[0].map((_,j)=&gt;A[i][0]*B[0][j]+A[i][1]*B[1][j]+A[i][2]*B[2][j]+A[i][3]*B[3][j]));
+const Tm=(x,y,z)=&gt;[[1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1]],I4=()=&gt;Tm(0,0,0);
+const ap=(M,v)=&gt;[0,1,2].map(i=&gt;M[i][0]*v[0]+M[i][1]*v[1]+M[i][2]*v[2]+M[i][3]);
+const fmt=n=&gt;(Math.abs(n)&lt;.005?0:n).toFixed(2);
+const pivot=()=&gt;$(&#x27;pivot&#x27;).value===&#x27;c&#x27;?OFF:[0,0,0];
+function mats(p){
+  const r=d=&gt;{const a=d*Math.PI/180;return[Math.cos(a),Math.sin(a)]},[cx,sx]=r(p.rx),[cy,sy]=r(p.ry),[cz,sz]=r(p.rz),q=pivot(),ab=M=&gt;mul(Tm(...q),mul(M,Tm(-q[0],-q[1],-q[2])));
+  const Rx=[[1,0,0,0],[0,cx,-sx,0],[0,sx,cx,0],[0,0,0,1]],Ry=[[cy,0,sy,0],[0,1,0,0],[-sy,0,cy,0],[0,0,0,1]],Rz=[[cz,-sz,0,0],[sz,cz,0,0],[0,0,1,0],[0,0,0,1]];
+  return{T:Tm(p.tx,p.ty,p.tz),S:ab([[p.sx,0,0,0],[0,p.sy,0,0],[0,0,p.sz,0],[0,0,0,1]]),R:ab(mul(Rz,mul(Ry,Rx)))};
+}
+function stages(p){const m=mats(p);let M=I4();return[...$(&#x27;order&#x27;).value].map(ch=&gt;{const prev=M;M=mul(m[ch],M);return{ch,M,op:m[ch],prev}})}
+function view(){
+  if(prog===null)return P;
+  const q={...ID};
+  [...$(&#x27;order&#x27;).value].forEach((ch,k)=&gt;{const f=clamp(prog-k,0,1);
+    if(ch===&#x27;T&#x27;){q.tx=P.tx*f;q.ty=P.ty*f;q.tz=P.tz*f}
+    if(ch===&#x27;S&#x27;){q.sx=1+(P.sx-1)*f;q.sy=1+(P.sy-1)*f;q.sz=1+(P.sz-1)*f}
+    if(ch===&#x27;R&#x27;){q.rx=P.rx*f;q.ry=P.ry*f;q.rz=P.rz*f}});
+  return q;
+}
+function proj(v,W){ // orbit camera then perspective (or orthographic)
+  const D=+$(&#x27;zoom&#x27;).value,cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const x1=v[0]*cy+v[2]*sy,z1=-v[0]*sy+v[2]*cy,y2=v[1]*cp-z1*sp,z2=v[1]*sp+z1*cp;
+  const d=D-z2,k=($(&#x27;persp&#x27;).checked?D/Math.max(d,.5):1)*W/14;
+  return[W/2+x1*k,W/2-y2*k,d];
+}
+function fit(){const d=devicePixelRatio||1,w=cv.clientWidth;cv.width=w*d;cv.height=w*d;ctx.setTransform(d,0,0,d,0,0);draw()}
+const mh=(M,c=&#x27;&#x27;)=&gt;`&lt;span class=&quot;mm ${c}&quot;&gt;${M.flat().map(n=&gt;`&lt;span&gt;${fmt(n)}&lt;/span&gt;`).join(&#x27;&#x27;)}&lt;/span&gt;`;
+function draw(){
+  const W=cv.clientWidth,pr=v=&gt;proj(v,W),sh=SH[$(&#x27;shape&#x27;).value];
+  ctx.clearRect(0,0,W,W);ctx.lineJoin=&#x27;round&#x27;;
+  ctx.strokeStyle=col(&#x27;--grid&#x27;);ctx.lineWidth=1;
+  for(let i=-6;i&lt;=6;i+=2){[[[i,0,-6],[i,0,6]],[[-6,0,i],[6,0,i]]].forEach(([a,b])=&gt;{const p=pr(a),q=pr(b);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke()})}
+  ctx.font=&#x27;700 12px system-ui&#x27;;
+  AX.forEach(([n,c,e])=&gt;{const o=pr([0,0,0]),p=pr(e);ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(o[0],o[1]);ctx.lineTo(p[0],p[1]);ctx.stroke();ctx.fillText(n,p[0]+4,p[1]-4)});
+  const edges=(pts,close=true)=&gt;sh.f.forEach(f=&gt;{ctx.beginPath();f.forEach((i,k)=&gt;k?ctx.lineTo(pts[i][0],pts[i][1]):ctx.moveTo(pts[i][0],pts[i][1]));ctx.closePath();ctx.stroke()});
+  const st=stages(view()),n=st.length;
+  ctx.setLineDash([6,5]);ctx.strokeStyle=col(&#x27;--orig&#x27;);ctx.lineWidth=1.3;edges(sh.v.map(pr));ctx.setLineDash([]);
+  if($(&#x27;steps&#x27;).checked)st.slice(0,-1).forEach((s,k)=&gt;{const c=col(&#x27;--c&#x27;+s.ch),pts=sh.v.map(v=&gt;pr(ap(s.M,v)));
+    ctx.globalAlpha=.65;ctx.strokeStyle=c;ctx.lineWidth=1.3;ctx.setLineDash([3,3]);edges(pts);ctx.setLineDash([]);
+    ctx.fillStyle=c;ctx.font=&#x27;600 11px system-ui&#x27;;ctx.fillText(`${k+1}. ${NAME[s.ch]}`,pts[0][0]+6,pts[0][1]-6);ctx.globalAlpha=1});
+  const M=st[n-1].M,out=sh.v.map(v=&gt;pr(ap(M,v)));
+  sh.f.map((f,i)=&gt;({f,i,z:f.reduce((a,j)=&gt;a+out[j][2],0)/f.length})).sort((a,b)=&gt;b.z-a.z).forEach(({f,i})=&gt;{
+    ctx.beginPath();f.forEach((j,k)=&gt;k?ctx.lineTo(out[j][0],out[j][1]):ctx.moveTo(out[j][0],out[j][1]));ctx.closePath();
+    ctx.globalAlpha=i?.28:.55;ctx.fillStyle=col(i?&#x27;--final&#x27;:&#x27;--face&#x27;);ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=col(&#x27;--final&#x27;);ctx.lineWidth=2;ctx.stroke()});
+  const pv=pr(pivot());ctx.fillStyle=col(&#x27;--pivot&#x27;);ctx.beginPath();ctx.arc(pv[0],pv[1],5,0,7);ctx.fill();
+  $(&#x27;mat&#x27;).innerHTML=M.flat().map(x=&gt;`&lt;span&gt;${fmt(x)}&lt;/span&gt;`).join(&#x27;&#x27;);
+  $(&#x27;formula&#x27;).innerHTML=&#x27;M = &#x27;+[...$(&#x27;order&#x27;).value].reverse().map(c=&gt;`&lt;span style=&quot;color:var(--c${c})&quot;&gt;${c}&lt;/span&gt;`).join(&#x27; · &#x27;);
+  $(&#x27;math&#x27;).innerHTML=st.map((s,i)=&gt;`&lt;div style=&quot;color:var(--c${s.ch});font-weight:600;font-size:.85rem&quot;&gt;${i+1}. ${NAME[s.ch]}&lt;/div&gt;&lt;div class=&quot;mrow&quot;&gt;${mh(s.op)} × ${mh(s.prev)} = ${mh(s.M)}&lt;/div&gt;`).join(&#x27;&#x27;);
+  $(&#x27;tbl&#x27;).innerHTML=&#x27;&lt;tr&gt;&lt;th&gt;V&lt;/th&gt;&lt;th&gt;Before&lt;/th&gt;&lt;th&gt;After&lt;/th&gt;&lt;/tr&gt;&#x27;+sh.v.map((v,i)=&gt;{const o=ap(M,v);return`&lt;tr&gt;&lt;td&gt;${i+1}&lt;/td&gt;&lt;td&gt;${v.map(fmt).join(&#x27;, &#x27;)}&lt;/td&gt;&lt;td&gt;${o.map(fmt).join(&#x27;, &#x27;)}&lt;/td&gt;&lt;/tr&gt;`}).join(&#x27;&#x27;);
+}
+function ui(){
+  ids.forEach(id=&gt;{$(id).value=P[id];$(id).nextElementSibling.textContent=id[0]===&#x27;r&#x27;?Math.round(P[id])+&#x27;°&#x27;:(+P[id]).toFixed(1)});
+  const o=[...$(&#x27;order&#x27;).value],on=prog===null?-1:Math.min(2,Math.floor(prog));
+  $(&#x27;chips&#x27;).innerHTML=o.map((c,i)=&gt;`&lt;span class=&quot;chip ${i===on?&#x27;on&#x27;:&#x27;&#x27;}&quot; style=&quot;--c:var(--c${c})&quot;&gt;${i+1}. ${NAME[c]}&lt;/span&gt;`).join(&#x27;&#x27;);
+  const t={S:`scale ${P.sx.toFixed(1)}/${P.sy.toFixed(1)}/${P.sz.toFixed(1)}`,R:`rotate ${Math.round(P.rx)}°/${Math.round(P.ry)}°/${Math.round(P.rz)}°`,T:`move (${P.tx.toFixed(1)}, ${P.ty.toFixed(1)}, ${P.tz.toFixed(1)})`};
+  const idn={S:P.sx===1&amp;&amp;P.sy===1&amp;&amp;P.sz===1,R:!P.rx&amp;&amp;!P.ry&amp;&amp;!P.rz,T:!P.tx&amp;&amp;!P.ty&amp;&amp;!P.tz},parts=o.filter(c=&gt;!idn[c]).map(c=&gt;t[c]);
+  $(&#x27;sum&#x27;).textContent=parts.length?&#x27;Ginagawa: &#x27;+parts.join(&#x27;, then &#x27;)+&#x27;.&#x27;:&#x27;Walang transformation pa. Galawin ang sliders.&#x27;;
+}
+const refresh=()=&gt;{ui();draw()};
+function stop(){if(raf)cancelAnimationFrame(raf);raf=null;prog=null;$(&#x27;play&#x27;).textContent=&#x27;▶ Play steps&#x27;}
+const change=()=&gt;{stop();refresh()};
+ids.forEach(id=&gt;$(id).addEventListener(&#x27;input&#x27;,()=&gt;{P[id]=+$(id).value;
+  if($(&#x27;lock&#x27;).checked&amp;&amp;id[0]===&#x27;s&#x27;)P.sx=P.sy=P.sz=P[id];change()}));
+document.querySelectorAll(&#x27;[data-reset]&#x27;).forEach(b=&gt;b.onclick=()=&gt;{const k=b.dataset.reset;
+  if(k===&#x27;T&#x27;)Object.assign(P,{tx:0,ty:0,tz:0});if(k===&#x27;S&#x27;)Object.assign(P,{sx:1,sy:1,sz:1});if(k===&#x27;R&#x27;)Object.assign(P,{rx:0,ry:0,rz:0});change()});
+$(&#x27;reset&#x27;).onclick=()=&gt;{P={...ID};change()};
+$(&#x27;rview&#x27;).onclick=()=&gt;{yaw=-.6;pitch=.45;$(&#x27;zoom&#x27;).value=14;draw()};
+[&#x27;shape&#x27;,&#x27;order&#x27;,&#x27;pivot&#x27;,&#x27;steps&#x27;].forEach(i=&gt;$(i).onchange=change);
+[&#x27;persp&#x27;,&#x27;zoom&#x27;].forEach(i=&gt;$(i).oninput=draw);
+$(&#x27;lock&#x27;).onchange=()=&gt;{if($(&#x27;lock&#x27;).checked){P.sy=P.sz=P.sx;change()}};
+perms(&#x27;SRT&#x27;).forEach(o=&gt;{const e=document.createElement(&#x27;option&#x27;);e.value=o;e.textContent=&#x27;Order: &#x27;+[...o].map(c=&gt;NAME[c]).join(&#x27; → &#x27;);$(&#x27;order&#x27;).appendChild(e)});
+PRESETS.forEach(([n,v])=&gt;{const b=document.createElement(&#x27;button&#x27;);b.className=&#x27;chip&#x27;;b.style.setProperty(&#x27;--c&#x27;,&#x27;var(--mute)&#x27;);b.textContent=n;b.onclick=()=&gt;{Object.assign(P,v);change()};$(&#x27;presets&#x27;).appendChild(b)});
+$(&#x27;play&#x27;).onclick=()=&gt;{
+  if(raf){stop();refresh();return}
+  const t0=performance.now(),D=1600;$(&#x27;play&#x27;).textContent=&#x27;■ Stop&#x27;;
+  const tick=now=&gt;{const t=(now-t0)/D;if(t&gt;=3){stop();refresh();return}prog=t;ui();draw();raf=requestAnimationFrame(tick)};
+  raf=requestAnimationFrame(tick);
+};
+$(&#x27;png&#x27;).onclick=()=&gt;cv.toBlob(b=&gt;{const a=document.createElement(&#x27;a&#x27;);a.href=URL.createObjectURL(b);a.download=&#x27;transformation-3d.png&#x27;;a.click()});
+$(&#x27;copy&#x27;).onclick=async()=&gt;{const t=stages(P).pop().M.map(r=&gt;r.map(fmt).join(&#x27;  &#x27;)).join(&#x27;\n&#x27;);
+  try{await navigator.clipboard.writeText(t);$(&#x27;copy&#x27;).textContent=&#x27;✓ Copied&#x27;}catch(e){$(&#x27;copy&#x27;).textContent=&#x27;Hindi ma-copy&#x27;}setTimeout(()=&gt;$(&#x27;copy&#x27;).textContent=&#x27;⧉ Copy matrix&#x27;,1500)};
+// orbit camera: drag to rotate the view
+let last=null;
+cv.addEventListener(&#x27;pointerdown&#x27;,e=&gt;{last=[e.clientX,e.clientY];cv.setPointerCapture(e.pointerId);cv.style.cursor=&#x27;grabbing&#x27;});
+cv.addEventListener(&#x27;pointermove&#x27;,e=&gt;{if(!last)return;yaw+=(e.clientX-last[0])*.01;pitch=clamp(pitch+(e.clientY-last[1])*.01,-1.5,1.5);last=[e.clientX,e.clientY];draw()});
+[&#x27;pointerup&#x27;,&#x27;pointercancel&#x27;].forEach(ev=&gt;cv.addEventListener(ev,()=&gt;{last=null;cv.style.cursor=&#x27;grab&#x27;}));
+cv.addEventListener(&#x27;wheel&#x27;,e=&gt;{e.preventDefault();$(&#x27;zoom&#x27;).value=clamp(+$(&#x27;zoom&#x27;).value+e.deltaY*.01,7,26);draw()},{passive:false});
+addEventListener(&#x27;resize&#x27;,fit);
+matchMedia(&#x27;(prefers-color-scheme:dark)&#x27;).addEventListener(&#x27;change&#x27;,draw);
+const tiles=document.getElementById(&#x27;tiles&#x27;);
+function buildTiles(){tiles.innerHTML=&#x27;&#x27;;[...$(&#x27;shape&#x27;).options].forEach(o=&gt;{const b=document.createElement(&#x27;button&#x27;);b.className=&#x27;tile&#x27;+(o.value===$(&#x27;shape&#x27;).value?&#x27; on&#x27;:&#x27;&#x27;);b.textContent=o.text.replace(&#x27;Shape: &#x27;,&#x27;&#x27;);b.setAttribute(&#x27;aria-pressed&#x27;,o.value===$(&#x27;shape&#x27;).value);b.onclick=()=&gt;{$(&#x27;shape&#x27;).value=o.value;$(&#x27;shape&#x27;).dispatchEvent(new Event(&#x27;change&#x27;))};tiles.appendChild(b)})}
+$(&#x27;shape&#x27;).addEventListener(&#x27;change&#x27;,buildTiles);buildTiles();
+ui();fit();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</div>
+<script>
+const f={2:document.getElementById('f2'),3:document.getElementById('f3')},t={2:document.getElementById('t2'),3:document.getElementById('t3')};
+function show(n){[2,3].forEach(k=>{f[k].classList.toggle('off',k!==n);t[k].setAttribute('aria-selected',k===n)});
+  try{f[n].contentWindow.dispatchEvent(new Event('resize'))}catch(e){}
+  try{history.replaceState(null,'','#'+n+'d')}catch(e){}}
+t[2].onclick=()=>show(2);t[3].onclick=()=>show(3);
+if(location.hash==='#3d')show(3);
+</script></body></html>
