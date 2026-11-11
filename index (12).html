@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TransformLab: Interactive 2D and 3D Transformation Visualizer</title>
+<meta name="description" content="Learn how moving, scaling, rotating, reflecting, and shearing a shape works in 2D and 3D.">
+<meta name="theme-color" content="#0f1624">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230f1624'/%3E%3Cpolygon points='50,18 82,36 50,54 18,36' fill='%234fb8d8'/%3E%3Cpolygon points='18,36 50,54 50,86 18,68' fill='%232bb3a6'/%3E%3Cpolygon points='50,54 82,36 82,68 50,86' fill='%231d7f86'/%3E%3C/svg%3E">
+<!-- 3D works offline if three.min.js and OrbitControls.js sit in the same folder as this file. Otherwise the internet copy is used. -->
+<script src="three.min.js"></script>
+<script>window.THREE||document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>')</script>
+<script src="OrbitControls.js"></script>
+<script>(window.THREE&&THREE.OrbitControls)||document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>')</script>
+<style>
+/* ===== Theme tokens ===== */
+:root{
+  --bg:#0f1624; --panel:#172033; --panel2:#1d2940; --line:#2a3955;
+  --text:#e6ecf5; --muted:#8fa0ba; --teal:#2bb3a6; --cyan:#4fb8d8; --orange:#e8873a;
+  --font:"Segoe UI",system-ui,sans-serif; --mono:Consolas,"Courier New",monospace;
+}
+:root[data-theme="light"]{
+  --bg:#eef2f7; --panel:#fff; --panel2:#f3f6fa; --line:#d3dbe7; --text:#1b2638; --muted:#5b6b85;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;min-height:100vh;overflow-x:hidden}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+/* ===== Layout ===== */
+nav{width:230px;background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.brand{padding:4px 10px 16px}
+.brand b{font-size:1.25rem;color:var(--teal)}
+.brand small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
+nav button{background:none;border:0;color:var(--muted);text-align:left;padding:10px 12px;border-radius:8px;font-size:.92rem}
+nav button:hover{background:var(--panel2);color:var(--text)}
+nav button.on{background:var(--teal);color:#fff}
+main{flex:1;padding:22px;min-width:0}
+h1{font-size:1.5rem;margin-bottom:4px}
+.sub{color:var(--muted);margin-bottom:18px;font-size:.92rem}
+.view{display:none}.view.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:8px 14px;border-radius:8px;font-size:.88rem}
+.btn:hover{border-color:var(--teal)}
+.btn.main{background:var(--orange);border-color:var(--orange);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tag{font-size:.78rem;color:var(--muted)}
+
+/* ===== 2D lab ===== */
+.lab{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px}
+#stage{width:100%;height:calc(100vh - 170px);min-height:420px;background:var(--panel);border:1px solid var(--line);border-radius:10px;display:block;touch-action:none}
+.ctl{display:grid;grid-template-columns:70px 1fr 64px;gap:8px;align-items:center;margin:7px 0;font-size:.85rem}
+.ctl input[type=range]{width:100%;accent-color:var(--teal);height:28px}
+.ctl input[type=number],select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px;width:100%;font-family:var(--mono)}
+details{margin-bottom:8px}summary{cursor:pointer;font-weight:600;padding:6px 0}
+table{border-collapse:collapse;font-family:var(--mono);font-size:.82rem;width:100%}
+td,th{padding:4px 8px;text-align:right;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}
+.mat{display:inline-grid;grid-template-columns:repeat(3,64px);gap:4px;font-family:var(--mono);border-left:2px solid var(--muted);border-right:2px solid var(--muted);padding:6px 10px;margin:6px 0}
+.mat span{text-align:right}
+.soon{border:1px dashed var(--line);border-radius:10px;padding:30px;color:var(--muted);text-align:center}
+ul.hist{list-style:none;padding:0}
+ul.hist li{padding:8px 0;border-bottom:1px solid var(--line);font-size:.88rem;font-family:var(--mono)}
+@media(max-width:900px){
+  body{flex-direction:column}
+  nav{width:100%;flex-direction:row;overflow-x:auto;padding:8px;border-right:0;border-bottom:1px solid var(--line)}
+  nav button{white-space:nowrap}.brand{display:none}
+  .lab{grid-template-columns:1fr}
+  #stage,#stage3{height:min(100vw - 40px,70vh);min-height:320px}
+  .lab>.stagewrap,.lab>#stage3{position:relative;top:auto}
+}
+.opt{display:block;width:100%;text-align:left;margin:6px 0}
+.good{border-color:var(--teal)!important}.bad{border-color:#c9534f!important}
+#seqList{padding-left:18px;margin:10px 0}#seqList li{padding:4px 0;font-family:var(--mono);font-size:.85rem}
+#seqList button{padding:2px 8px;margin-left:4px}
+#stage3 canvas{display:block}
+.ctl input:disabled{opacity:.4;cursor:not-allowed}
+.hud{position:absolute;top:12px;right:12px;z-index:5;pointer-events:none;min-width:176px;max-width:236px;padding:10px 12px 11px;border-radius:14px;color:var(--text);font:12px/1.4 Consolas,"Courier New",monospace;
+  background:color-mix(in srgb,var(--panel) 78%,transparent);-webkit-backdrop-filter:blur(10px) saturate(1.4);backdrop-filter:blur(10px) saturate(1.4);
+  border:1px solid color-mix(in srgb,var(--teal) 38%,var(--line));box-shadow:0 10px 28px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.06)}
+.hud::before{content:"";position:absolute;left:12px;right:12px;top:0;height:2px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,var(--teal),var(--orange))}
+.hud .hh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font:700 10px/1 var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.hud .hh span{display:flex;align-items:center;gap:6px}
+.hud .hh i{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 28%,transparent);animation:hudp 1.9s ease-in-out infinite}
+.hud .hh em{font-style:normal;color:var(--teal)}
+@keyframes hudp{50%{box-shadow:0 0 0 6px transparent}}
+.hud .mx{display:grid;gap:3px 12px;width:max-content;margin:0 auto 9px;padding:4px 9px;border:2px solid var(--muted);border-width:0 2px;border-radius:7px;background:color-mix(in srgb,var(--panel2) 55%,transparent)}
+.hud .mx span{text-align:right;color:var(--muted);opacity:.75;font-variant-numeric:tabular-nums}
+.hud .mx span.v{color:var(--orange);font-weight:700;opacity:1}
+.hud .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.hud .chip{padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--teal) 15%,transparent);border:1px solid color-mix(in srgb,var(--teal) 30%,transparent);font-size:11px;white-space:nowrap}
+.hud .chip b{color:var(--teal);margin-right:5px;font-weight:700}
+.hud .pts{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;padding-top:7px;border-top:1px dashed var(--line);font-size:11px;white-space:nowrap}
+.hud .pts b{color:var(--orange);margin-right:4px}
+@media(max-width:600px){.hud{display:none!important}}
+#lockBtn[aria-pressed="true"]{background:var(--orange);border-color:var(--orange);color:#fff}
+.mat4{grid-template-columns:repeat(4,64px)!important}
+.small{width:70px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px;font-family:var(--mono)}
+.top{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+.rel{position:relative}.search{flex:1}
+.search input{width:100%;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:20px;padding:10px 16px;font:inherit}
+.drop{display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:240px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;z-index:20;flex-direction:column;gap:6px}
+.search .drop{left:0;right:auto;width:100%}.drop.open{display:flex}
+.drop button{text-align:left}.drop p{font-size:.85rem;padding:4px;border-bottom:1px solid var(--line)}
+.badge{position:absolute;top:-6px;right:-6px;background:var(--orange);color:#fff;border-radius:10px;font-size:.7rem;padding:1px 6px}
+.avatar{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--teal);color:#fff;font-weight:700}
+.sw{display:flex;gap:6px;align-items:center;color:var(--muted)}
+.hero{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;align-items:center;margin-bottom:14px;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:28px 28px;background-color:var(--panel)}
+.hero h1{font-size:1.9rem}.tagline{font-style:italic;font-size:1.1rem;margin:4px 0 8px}
+.heroart{display:flex;flex-direction:column;gap:6px;align-items:center}.heroart code{font-family:var(--mono);font-size:.85rem;color:var(--muted)}
+.r2{grid-template-columns:1fr 1fr 250px;margin-bottom:14px}
+.r3{grid-template-columns:1.4fr 1fr 1.1fr 1fr}
+.sp{justify-content:space-between}.plain{list-style:none;padding:0;margin:8px 0;font-size:.85rem}
+.plain li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.link{background:none;border:0;color:var(--cyan);font-size:.82rem}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.th{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px;color:var(--text);text-align:left;display:flex;flex-direction:column;gap:2px;font-size:.82rem}
+.keep{background:var(--panel2)}
+.promo{margin-top:auto;text-align:center;font-size:.8rem;color:var(--muted);padding-top:14px}
+@media(max-width:1100px){.r2,.r3{grid-template-columns:1fr 1fr}.hero{grid-template-columns:1fr}}
+@media(max-width:600px){.r2,.r3{grid-template-columns:1fr}.promo{display:none}}
+#stage3{position:relative}
+.lab3{position:absolute;left:0;top:0;pointer-events:none;font:12px Consolas,monospace;white-space:nowrap;text-shadow:0 0 3px var(--bg),0 0 3px var(--bg),0 0 3px var(--bg)}
+.stagewrap{position:relative;width:100%;min-width:0;align-self:start}
+.lab>.stagewrap,.lab>#stage3{position:sticky;top:12px;align-self:start}
+#stage3{width:100%;height:calc(100vh - 170px);min-height:420px}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{min-width:40px;height:40px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:1.15rem}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.lcard{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;color:var(--text);display:flex;flex-direction:column;gap:6px}
+.lcard:hover{border-color:var(--teal)}
+.chip{font-size:.72rem;padding:2px 8px;border-radius:10px;border:1px solid var(--line);align-self:flex-start;color:var(--muted)}
+.chip.done{background:var(--teal);color:#fff;border-color:var(--teal)}
+.bar{height:8px;border-radius:6px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--teal)}
+#backBtn{position:fixed;left:12px;bottom:14px;z-index:30;display:none;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.btn,nav button,.lcard,.th,.zoom button{transition:background .15s,border-color .15s,transform .08s,filter .15s}
+.btn:hover{background:var(--line)}.btn.main:hover{filter:brightness(1.1);background:var(--orange)}
+.btn:active,nav button:active,.lcard:active,.th:active,.zoom button:active{transform:scale(.96)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type=checkbox].tog,.sw input{appearance:none;-webkit-appearance:none;width:44px;height:25px;border-radius:13px;background:var(--line);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;margin:0}
+input[type=checkbox].tog::after,.sw input::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:transform .2s}
+input[type=checkbox].tog:checked,.sw input:checked{background:var(--teal)}
+input[type=checkbox].tog:checked::after,.sw input:checked::after{transform:translateX(19px)}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.setrow select{width:auto;min-width:130px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);background:var(--teal);color:#fff;padding:9px 18px;border-radius:20px;font-size:.88rem;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:99}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+ul.hist li{display:flex;justify-content:space-between;align-items:center;gap:8px}
+table.info{font-family:inherit;font-size:.85rem}
+table.info td,table.info th{text-align:left;vertical-align:top}
+</style>
+</head>
+<body>
+
+<nav id="nav" aria-label="Main navigation">
+  <div class="brand"><b>TransformLab</b><small>Move. Rotate. Scale. Understand.</small></div>
+</nav>
+
+<main>
+  <header class="top">
+    <div class="rel search"><input id="q" type="search" placeholder="Search lessons, tools, or topics..." aria-label="Search lessons, tools, or topics" autocomplete="off"><div id="qres" class="drop"></div></div>
+    <label class="sw" title="Switch theme"><span>☀</span><input type="checkbox" id="themeSw" aria-label="Dark theme"><span>☾</span></label>
+    <div class="rel"><button class="btn" id="bell" aria-label="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span id="badge" class="badge">3</span></button><div id="notes" class="drop"></div></div>
+    <div class="rel"><button class="avatar" id="avatar" aria-label="Account menu">DL</button><div id="umenu" class="drop"><b>Dave Lausa</b><button class="btn" data-go="settings">Settings</button><button class="btn" data-go="history">History</button><button class="btn" data-go="about">About</button></div></div>
+  </header>
+  <!-- Dashboard -->
+  <section class="view" id="v-dashboard">
+    <div class="card hero">
+      <div><h1>Welcome to TransformLab!</h1><p class="tagline">Move. Rotate. Scale. Understand.</p>
+        <p class="sub">An interactive mathematics laboratory to explore 2D and 3D geometric transformations.</p>
+        <button class="btn main" data-go="2d">Start Exploring</button></div>
+      <div class="heroart"><canvas id="demo" width="260" height="160" aria-label="Spinning square demo"></canvas>
+        <code>T(x, y) = (x + a, y + b)</code><code>R(θ) = [cosθ −sinθ ; sinθ cosθ]</code></div>
+    </div>
+    <div class="grid r2">
+      <div class="card"><span class="tag">2D Laboratory</span><h3>2D Transformations</h3><p class="sub">Move, rotate, scale and more on a coordinate plane.</p>
+        <svg viewBox="0 0 120 80" width="120" aria-hidden="true"><path d="M10 70H110M20 5V75" stroke="#8fa0ba"/><polygon points="30,65 80,65 55,18" fill="rgba(43,179,166,.35)" stroke="#2bb3a6" stroke-width="2"/></svg><br>
+        <button class="btn main" data-go="2d">Open 2D Lab</button></div>
+      <div class="card"><span class="tag">3D Laboratory</span><h3>3D Transformations</h3><p class="sub">Explore transformations in a 3D space.</p><svg viewBox="0 0 120 120" width="120" aria-hidden="true"><polygon points="60,20 100,40 60,60 20,40" fill="#4fb8d8"/><polygon points="20,40 60,60 60,105 20,85" fill="#2bb3a6"/><polygon points="60,60 100,40 100,85 60,105" fill="#1d7f86"/></svg><br>
+        <button class="btn main" data-go="3d">Open 3D Lab</button></div>
+      <div class="card"><h3>Your Progress</h3>
+        <div class="row"><svg viewBox="0 0 100 100" width="90"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--line)" stroke-width="10"/><circle id="ringArc" cx="50" cy="50" r="40" fill="none" stroke="var(--teal)" stroke-width="10" stroke-dasharray="0 251.3" transform="rotate(-90 50 50)"/><text id="ringTxt" x="50" y="56" text-anchor="middle" fill="currentColor" font-size="20" font-weight="700">0%</text></svg>
+        <div><span class="tag">Lessons completed</span><br><b id="lessonsDone">0 / 10</b></div></div>
+        <ul class="plain" id="doneList"></ul><button class="btn" data-go="history">View Details</button></div>
+    </div>
+    <div class="grid r3">
+      <div class="card"><div class="row sp"><h3>Featured Lessons</h3><button class="link" data-go="learn">See All</button></div>
+        <div class="thumbs"><button class="th" data-lesson="1"><svg viewBox="0 0 70 56" width="100%" aria-hidden="true"><rect x="8" y="16" width="20" height="20" fill="none" stroke="#8fa0ba" stroke-dasharray="3"/><rect x="38" y="16" width="20" height="20" fill="#2bb3a6"/><path d="M30 26h6" stroke="#e8873a" stroke-width="2"/></svg><b>Translation</b><span class="tag">Move shapes easily</span></button><button class="th" data-lesson="3"><svg viewBox="0 0 70 56" width="100%" aria-hidden="true"><rect x="18" y="14" width="20" height="20" fill="none" stroke="#8fa0ba" stroke-dasharray="3"/><rect x="26" y="14" width="20" height="20" fill="#e8873a" transform="rotate(30 36 24)"/></svg><b>Rotation</b><span class="tag">Turn around a point</span></button><button class="th" data-lesson="2"><svg viewBox="0 0 70 56" width="100%" aria-hidden="true"><rect x="12" y="10" width="46" height="36" fill="none" stroke="#8fa0ba" stroke-dasharray="3"/><rect x="22" y="18" width="24" height="20" fill="#e8873a"/></svg><b>Scaling</b><span class="tag">Change the size</span></button></div></div>
+      <div class="card"><h3>Quick Tools</h3><div class="grid g2" style="gap:8px"><button class="btn" data-go="matrix">Matrix Calculator</button><button class="btn" data-go="compare">Compare Shapes</button><button class="btn" data-go="learn">Learning Center</button></div></div>
+      <div class="card"><div class="row sp"><h3>Recent Activity</h3><button class="link" data-go="history">See All</button></div><ul class="plain" id="actList"></ul></div>
+      <div class="card keep"><h3>Keep Learning!</h3><p class="sub">Math is more fun with TransformLab!</p><button class="btn main" data-go="learn">Continue Learning</button></div>
+    </div>
+  </section>
+
+  <!-- 2D lab -->
+  <section class="view" id="v-2d">
+    <h1>2D Transformations</h1>
+    <p class="sub">Teal dashed is the original. Orange is the result. Drag the orange shape with your mouse to move it, or use the sliders. Press Lock to freeze its position.</p>
+    <div class="lab">
+      <div class="stagewrap"><canvas id="stage"></canvas><div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zreset" aria-label="Reset view">Fit</button></div><div id="hud2" class="hud"></div></div>
+      <div class="card">
+        <div class="ctl"><label for="shape">Shape</label>
+          <select id="shape" style="grid-column:2/4">
+            <option value="square">Square</option><option value="rect">Rectangle</option>
+            <option value="triangle">Triangle</option><option value="circle">Circle</option>
+            <option value="pentagon">Pentagon</option><option value="custom">Custom (drawn)</option>
+          </select></div>
+        <div class="row" style="margin-bottom:6px"><button class="btn" id="drawBtn">Draw shape</button><button class="btn" id="finBtn">Finish</button><button class="btn" id="clrBtn">Clear drawing</button><button class="btn" id="lockBtn" aria-pressed="false" title="Lock the shape position">🔓 Lock position</button><button class="btn main" id="to3d">See it in 3D</button></div>
+        <div class="tag" id="detected" style="margin-bottom:6px"></div><label class="tag" style="display:block;margin-bottom:8px"><input type="checkbox" id="lbl2" checked> Show point labels</label><label class="tag" style="display:block;margin-bottom:8px"><input type="checkbox" id="hudc2" checked> Live numbers on canvas</label>
+        <details open><summary>Translation</summary><div id="c-trans"></div></details>
+        <details open><summary>Rotation</summary><div id="c-rot"></div>
+          <div class="row"><button class="btn" data-ang="45">45°</button><button class="btn" data-ang="90">90°</button><button class="btn" data-ang="180">180°</button><button class="btn" data-ang="270">270°</button></div></details>
+        <details open><summary>Scaling</summary><div id="c-scale"></div>
+          <label class="tag"><input type="checkbox" id="uniform"> Uniform scaling</label></details>
+        <details><summary>Shear</summary><div id="c-shear"></div></details>
+        <details><summary>Reflection</summary>
+          <select id="refl"><option value="none">None</option><option value="x">Across X axis</option><option value="y">Across Y axis</option><option value="o">Across origin</option><option value="d">Across line y = x</option></select></details>
+        <details><summary>Pivot point</summary><div id="c-pivot"></div><div class="tag">Rotation and scaling happen around this point.</div></details>
+        <div class="ctl"><label>Preset</label><select id="pre2" style="grid-column:2/4"><option value="">Load a demo...</option><option value="sq">Square rotation</option><option value="tri">Triangle translation</option><option value="rect">Rectangle scaling</option><option value="refl">Reflection demo</option></select></div>
+        <div class="row" style="margin-bottom:8px"><button class="btn" id="play2">Play</button><button class="btn" id="pause2">Pause</button><button class="btn" id="rst2">Reset animation</button></div>
+        <div class="row"><button class="btn" id="save">Save to history</button><button class="btn" id="reset">Reset all</button></div>
+      </div>
+    </div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h3>Coordinates</h3><table id="coords"></table></div>
+      <div class="card"><h3>Final matrix (3×3)</h3><div id="matBox1"></div>
+        <div class="tag">Order applied: scale, shear, reflect, rotate (around pivot), then translate.</div></div>
+    </div>
+  </section>
+
+  <!-- Matrix view reuses the same state -->
+  <section class="view" id="v-matrix">
+    <h1>Transformation Matrix</h1>
+    <p class="sub">Each step as its own homogeneous 3×3 matrix. Change values in the 2D lab and they update here.</p>
+    <div class="card" id="matSteps"></div>
+  </section>
+
+  <section class="view" id="v-history">
+    <h1>History</h1>
+    <p class="sub">Saved from the 2D lab. Stored in this browser only.</p>
+    <div class="card"><ul class="hist" id="histList"></ul>
+      <button class="btn" id="clearHist">Clear history</button></div>
+  </section>
+
+  <section class="view" id="v-settings"><h1>Settings</h1><p class="sub">Saved automatically on this device.</p>
+    <div class="card">
+      <div class="setrow"><label for="themeTog">Dark theme</label><input type="checkbox" class="tog" id="themeTog"></div>
+      <div class="setrow"><label for="gridToggle">Show grid</label><input type="checkbox" class="tog" id="gridToggle"></div>
+      <div class="setrow"><label for="axesToggle">Show axes</label><input type="checkbox" class="tog" id="axesToggle"></div>
+      <div class="setrow"><label for="spd">Animation speed</label><select id="spd"><option value="0.5">Slow</option><option value="1">Normal</option><option value="2">Fast</option></select></div>
+      <div class="setrow"><label for="defShape">Start with shape</label><select id="defShape"><option value="square">Square</option><option value="rect">Rectangle</option><option value="triangle">Triangle</option><option value="circle">Circle</option><option value="pentagon">Pentagon</option></select></div>
+      <div class="row" style="margin-top:14px"><button class="btn" id="resetPrefs">Reset preferences</button><button class="btn" id="resetProg">Reset learning progress</button></div>
+    </div></section>
+
+  <section class="view" id="v-about">
+    <h1>About TransformLab</h1>
+    <p class="sub">Version 1.0. An interactive way to see how geometric transformations work.</p>
+
+    <div class="card">
+      <h3>What is TransformLab?</h3>
+      <p>TransformLab is a learning tool that shows how <b>moving, scaling, and rotating</b> a shape really works. It also covers reflecting and shearing. You can try every change in 2D and in 3D, and the numbers behind each change are always on screen, so you can see the math and the picture at the same time.</p>
+    </div>
+
+    <h3 style="margin:18px 0 8px">What you can do here</h3>
+    <div class="grid g2">
+      <div class="card"><b>2D Lab</b><p class="sub">Pick or draw a shape, then move, rotate, scale, flip, or slant it. Drag the shape with your mouse to move it, lock its position, and zoom and pan the plane.</p><button class="btn" data-go="2d">Open 2D Lab</button></div>
+      <div class="card"><b>3D Lab</b><p class="sub">Your 2D shape becomes a solid (a square becomes a cube). Whatever you do in 2D carries over, and you can add 3D moves on top.</p><button class="btn" data-go="3d">Open 3D Lab</button></div>
+      <div class="card"><b>Transformation Matrix</b><p class="sub">See the matrix for every step and the final matrix that is multiplied with each corner.</p><button class="btn" data-go="matrix">Open Matrix</button></div>
+      <div class="card"><b>Compare</b><p class="sub">Build a list of steps and see why the order of steps changes the result.</p><button class="btn" data-go="compare">Open Compare</button></div>
+      <div class="card"><b>Learning Center</b><p class="sub">Ten short lessons from easy to medium, each with a live demo you can try right inside the lesson.</p><button class="btn" data-go="learn">Open Lessons</button></div>
+      <div class="card"><b>History</b><p class="sub">Save a setup and load it again later. Your lessons and settings are remembered on this device.</p><button class="btn" data-go="history">Open History</button></div>
+    </div>
+
+    <h3 style="margin:18px 0 8px">How it works</h3>
+    <div class="card">
+      <p>Every change is turned into a <b>matrix</b>, a small grid of numbers. TransformLab multiplies the matrices into one final matrix and applies it to every corner of the shape. That is why the picture and the table always agree.</p>
+      <div class="grid g2" style="margin-top:10px">
+        <div><b>1. Input</b><p class="sub">The shape and the values you set with sliders or number boxes.</p></div>
+        <div><b>2. Process</b><p class="sub">Build a 3×3 matrix in 2D or a 4×4 matrix in 3D, then multiply.</p></div>
+        <div><b>3. Output</b><p class="sub">The new shape, the new coordinates, and the matrix.</p></div>
+      </div>
+      <p class="tag">The order used in the labs: scale, shear, reflect, rotate, then move.</p>
+    </div>
+
+    <h3 style="margin:18px 0 8px">The five transformations</h3>
+    <div class="card" style="overflow-x:auto">
+      <table class="info">
+        <tr><th>Name</th><th>What it does</th><th>Formula</th><th>Example</th></tr>
+        <tr><td>Translation</td><td>Slides every point the same distance</td><td>(x + a, y + b)</td><td>(1, 1) moved by (4, 2) becomes (5, 3)</td></tr>
+        <tr><td>Scaling</td><td>Makes a shape bigger or smaller</td><td>(sx · x, sy · y)</td><td>(3, 2) scaled by 2 becomes (6, 4)</td></tr>
+        <tr><td>Rotation</td><td>Turns a shape around a pivot</td><td>(x cosθ − y sinθ, x sinθ + y cosθ)</td><td>(2, 0) turned 90° becomes (0, 2)</td></tr>
+        <tr><td>Reflection</td><td>Flips a shape like a mirror</td><td>across the y axis: (−x, y)</td><td>(3, 5) becomes (−3, 5)</td></tr>
+        <tr><td>Shearing</td><td>Slants a shape sideways</td><td>(x + k · y, y)</td><td>(1, 1) with k = 2 becomes (3, 1)</td></tr>
+      </table>
+    </div>
+
+    <h3 style="margin:18px 0 8px">How to read the screen</h3>
+    <div class="grid g2">
+      <div class="card"><b>Colors</b><ul class="plain"><li><span>Teal dashed outline</span><span class="tag">original shape</span></li><li><span>Orange shape</span><span class="tag">the result</span></li><li><span>Cyan dot</span><span class="tag">pivot point</span></li><li><span>Red, green, blue axes</span><span class="tag">x, y, z</span></li></ul></div>
+      <div class="card"><b>Handy tips</b><ul class="plain"><li>Pinch or scroll to zoom the 2D plane.</li><li>Drag the orange shape (2D or 3D) to move it. Press Lock position to freeze it.</li><li>Tap Draw shape, tap points, then Finish. TransformLab names your shape.</li><li>Tap See it in 3D to turn it into a solid.</li><li>Letters mark corners, and the table shows their numbers.</li></ul></div>
+    </div>
+
+    <h3 style="margin:18px 0 8px">Good to know</h3>
+    <div class="card">
+      <ul class="plain">
+        <li><span>Made with</span><span class="tag">HTML, CSS, JavaScript, Three.js</span></li>
+        <li><span>Your data</span><span class="tag">saved only in this browser</span></li>
+        <li><span>3D lab</span><span class="tag">works offline when three.min.js and OrbitControls.js are in the same folder</span></li>
+        <li><span>Not included yet</span><span class="tag">reflection across a custom line, custom 3D objects</span></li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>Credits</h3>
+      <p>Made by <b>Dave Lausa</b> for the Multimedia final project, Transformation Visualizer, November 2026.</p>
+    </div>
+  </section>
+  <section class="view" id="v-3d"><h1>3D Transformations</h1>
+<p class="sub">Drag the object to move it. Drag empty space to orbit, scroll to zoom, right drag to pan. The teal wireframe is the original.</p>
+<div class="lab"><div id="stage3" class="card" style="padding:0;overflow:hidden"><div id="hud3" class="hud"></div></div>
+<div class="card">
+<div class="ctl"><label>Object</label><select id="obj3" style="grid-column:2/4"><option value="from2d">From 2D shape</option><option value="cube">Cube</option><option value="sphere">Sphere</option><option value="cone">Cone</option><option value="cylinder">Cylinder</option><option value="pyramid">Pyramid</option><option value="torus">Torus</option></select></div>
+<div class="ctl"><label>Color</label><input type="color" id="col3" value="#e8873a"><label class="tag"><input type="checkbox" id="wire3"> Wire</label></div>
+<label class="tag"><input type="checkbox" id="link3" checked> Link to 2D shape</label><div class="tag" id="info3" style="margin-bottom:6px"></div>
+<div id="c3"></div>
+<div class="ctl"><label>Reflect</label><select id="ref3" style="grid-column:2/4"><option value="none">None</option><option value="xy">XY plane</option><option value="yz">YZ plane</option><option value="xz">XZ plane</option></select></div>
+<div class="ctl"><label>Rot order</label><select id="ord3" style="grid-column:2/4"><option>XYZ</option><option>ZYX</option><option>YXZ</option></select></div>
+<div class="ctl"><label>Preset</label><select id="pre3" style="grid-column:2/4"><option value="">Load a demo...</option><option value="cube">Cube rotation</option><option value="sphere">Sphere scaling</option><option value="move">3D translation</option></select></div>
+<div class="row"><label class="tag"><input type="checkbox" id="orig3" checked> Original</label><label class="tag"><input type="checkbox" id="axes3c" checked> Axes</label><label class="tag"><input type="checkbox" id="grid3c" checked> Grid</label><label class="tag"><input type="checkbox" id="lbl3" checked> Point letters</label><label class="tag"><input type="checkbox" id="lblc3"> Show coordinates</label><label class="tag"><input type="checkbox" id="hudc3" checked> Live numbers</label></div>
+<div class="row" style="margin-top:8px"><button class="btn" id="play3">Play</button><button class="btn" id="pause3">Pause</button><button class="btn" id="rst3">Reset animation</button></div>
+<div class="row" style="margin-top:8px"><button class="btn" id="resetObj3">Reset object</button><button class="btn" id="resetCam3">Reset camera</button></div>
+</div></div>
+<div class="card" style="margin-top:14px"><h3>Final matrix (4×4)</h3><div id="mat4"></div><table id="tbl3" style="margin-top:10px"></table><div class="tag">Order applied: scale, shear, reflect, rotate, then translate.</div></div></section>
+  <section class="view" id="v-compare"><h1>Compare Transformations</h1>
+<p class="sub">Build a sequence. Orange follows your order. Cyan runs the same steps in reverse, so you can see that order matters.</p>
+<div class="lab"><canvas id="cmp" style="width:100%;height:calc(100vh - 215px);min-height:380px;background:var(--panel);border:1px solid var(--line);border-radius:10px;display:block"></canvas>
+<div class="card">
+<div class="row"><select id="stType"><option value="move">Move (x, y)</option><option value="rotate">Rotate (degrees)</option><option value="scale">Scale (x, y)</option><option value="shear">Shear (x, y)</option><option value="reflectX">Reflect X axis</option><option value="reflectY">Reflect Y axis</option><option value="reflectO">Reflect origin</option></select>
+<input class="small" id="stA" type="number" step="any" value="3" placeholder="x"><input class="small" id="stB" type="number" step="any" value="0" placeholder="y"><button class="btn main" id="stAdd">Add</button></div>
+<ol id="seqList"></ol>
+<div class="row"><button class="btn" id="stUndo">Undo</button><button class="btn" id="stRedo">Redo</button><button class="btn" id="stClear">Clear</button></div>
+<div class="row" style="margin-top:8px"><button class="btn" id="playC">Play</button><button class="btn" id="pauseC">Pause</button><button class="btn" id="rstC">Reset animation</button></div>
+<div class="row" style="margin-top:8px"><select id="cmpShape"><option value="triangle">Triangle</option><option value="square">Square</option><option value="rect">Rectangle</option></select><label class="tag"><input type="checkbox" id="showOrig" checked> Show original</label></div>
+<h3 style="margin-top:12px">Your order matrix</h3><div id="seqMat"></div></div></div></section>
+  <section class="view" id="v-learn"><div id="learnRoot"></div></section>
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<button class="btn main" id="backBtn">← Back to lesson</button>
+<script>
+"use strict";
+/* Error notice: shows the real message for a few seconds so it can be reported, and ignores the harmless ResizeObserver warning */
+window.addEventListener("error", e => {
+  if (/ResizeObserver/.test(e.message || "")){ e.stopImmediatePropagation(); return; }
+  console.error("TransformLab error:", e.message, e.filename, e.lineno);
+  const t = document.createElement("div");
+  t.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99;background:#3a1f1f;color:#fff;padding:8px 12px;border-radius:8px;font:12px sans-serif";
+  t.textContent = "Error: " + (e.message || "unknown") + (e.lineno ? " (line " + e.lineno + ")" : "");
+  document.body.appendChild(t); setTimeout(() => t.remove(), 8000);
+});
+/* =========================================================
+   1. MATH (no drawing code here)
+   3x3 homogeneous matrices stored as arrays of 3 rows
+   ========================================================= */
+const Mat = {
+  identity: () => [[1,0,0],[0,1,0],[0,0,1]],
+  mul(a, b){ // a x b
+    return a.map((_, i) => b[0].map((_, j) => a[i][0]*b[0][j] + a[i][1]*b[1][j] + a[i][2]*b[2][j]));
+  },
+  translate: (tx, ty) => [[1,0,tx],[0,1,ty],[0,0,1]],
+  // counterclockwise positive angle, y axis up
+  rotate(deg){ const r = deg*Math.PI/180, c = Math.cos(r), s = Math.sin(r); return [[c,-s,0],[s,c,0],[0,0,1]]; },
+  scale: (sx, sy) => [[sx,0,0],[0,sy,0],[0,0,1]],
+  shear: (shx, shy) => [[1,shx,0],[shy,1,0],[0,0,1]],
+  reflect(kind){
+    return { none:[[1,0,0],[0,1,0],[0,0,1]], x:[[1,0,0],[0,-1,0],[0,0,1]],
+             y:[[-1,0,0],[0,1,0],[0,0,1]], o:[[-1,0,0],[0,-1,0],[0,0,1]],
+             d:[[0,1,0],[1,0,0],[0,0,1]] }[kind];
+  },
+  apply(m, p){ return { x: m[0][0]*p.x + m[0][1]*p.y + m[0][2], y: m[1][0]*p.x + m[1][1]*p.y + m[1][2] }; },
+  // do transform `m` around pivot point: T(p) * m * T(-p)
+  aroundPivot: (m, px, py) => Mat.mul(Mat.translate(px,py), Mat.mul(m, Mat.translate(-px,-py)))
+};
+
+const SHAPES = {
+  square:   () => [[-1,-1],[1,-1],[1,1],[-1,1]],
+  rect:     () => [[-2,-1],[2,-1],[2,1],[-2,1]],
+  triangle: () => [[-1.5,-1],[1.5,-1],[0,2]],
+  pentagon: () => Array.from({length:5}, (_, i) => { const a = Math.PI/2 + i*2*Math.PI/5; return [1.6*Math.cos(a), 1.6*Math.sin(a)]; }),
+  circle:   () => Array.from({length:40}, (_, i) => { const a = i*2*Math.PI/40; return [1.5*Math.cos(a), 1.5*Math.sin(a)]; })
+};
+
+/* Each step returned separately so the Matrix page can show them */
+function buildSteps(s){
+  const rp = Mat.apply(Mat.reflect(s.refl), { x: s.px, y: s.py }); // after a flip the shape (and its pivot) sits on the other side
+  return [
+    { name: "Scale",       m: Mat.aroundPivot(Mat.scale(s.sx, s.sy), s.px, s.py) },
+    { name: "Shear",       m: Mat.aroundPivot(Mat.shear(s.shx, s.shy), s.px, s.py) },
+    { name: "Reflect",     m: Mat.reflect(s.refl) },
+    { name: "Rotate",      m: Mat.aroundPivot(Mat.rotate(s.rot), rp.x, rp.y) },
+    { name: "Translate",   m: Mat.translate(s.tx, s.ty) }
+  ];
+}
+// area centroid of a shape's outline, so a drawn shape can spin and scale around its own middle
+function centroid2(name){
+  const pts = SHAPES[name] ? SHAPES[name]() : []; if (!pts.length) return [0, 0];
+  let a = 0, cx = 0, cy = 0;
+  pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length], k = p[0] * q[1] - q[0] * p[1]; a += k; cx += (p[0] + q[0]) * k; cy += (p[1] + q[1]) * k; });
+  const r = v => Math.round(v * 100) / 100;
+  if (Math.abs(a) < 1e-9) return [r(pts.reduce((t, p) => t + p[0], 0) / pts.length), r(pts.reduce((t, p) => t + p[1], 0) / pts.length)];
+  return [r(cx / (3 * a)), r(cy / (3 * a))];
+}
+function finalMatrix(s){
+  // first step is applied first, so it sits on the right of the product
+  return buildSteps(s).reduce((acc, st) => Mat.mul(st.m, acc), Mat.identity());
+}
+
+/* =========================================================
+   2. STATE + STORAGE
+   ========================================================= */
+const DEFAULTS = { tx:0, ty:0, rot:0, sx:1, sy:1, shx:0, shy:0, px:0, py:0, refl:"none" };
+const state = { shape:"square", ...DEFAULTS };
+const store = {
+  get(k, fallback){ try { const v = localStorage.getItem("tl_"+k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
+  set(k, v){ try { localStorage.setItem("tl_"+k, JSON.stringify(v)); } catch {} }
+};
+let prefs = { theme:"dark", grid:true, axes:true, ...store.get("prefs", {}) };
+
+/* =========================================================
+   3. NAVIGATION
+   ========================================================= */
+const NAV = [["dashboard","Dashboard"],["2d","2D Transformations"],["3d","3D Transformations"],["matrix","Transformation Matrix"],
+  ["compare","Compare Transformations"],["learn","Learning Center"],["history","History"],["settings","Settings"],["about","About"]];
+const navEl = document.getElementById("nav");
+NAV.forEach(([id, label]) => {
+  const b = document.createElement("button"); b.textContent = label; b.dataset.id = id; b.onclick = () => go(id); navEl.appendChild(b);
+});
+const promo = document.createElement("div"); promo.className = "promo";
+promo.innerHTML = '<svg viewBox="0 0 120 120" width="64" aria-hidden="true"><polygon points="60,20 100,40 60,60 20,40" fill="#4fb8d8"/><polygon points="20,40 60,60 60,105 20,85" fill="#2bb3a6"/><polygon points="60,60 100,40 100,85 60,105" fill="#1d7f86"/></svg><p>Explore the power of geometric transformations!</p>'; navEl.appendChild(promo);
+function go(id){
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-"+id));
+  navEl.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.id === id));
+  if (id === "2d"){ syncUI2(); update(); } // pick up anything changed from the 3D page
+  if (id === "history") renderHistory();
+  if (id === "matrix") renderMatrixPage();
+  document.querySelectorAll(".drop").forEach(d => d.classList.remove("open"));
+  if (id === "3d"){ show3(); fitCam(); } // frame the object so it never sits off screen
+  if (id === "compare") drawCmp();
+  if (id === "learn"){ if (!pendingOpen) lessonView = false; pendingOpen = false; backLesson = null; renderLessons(); }
+  $("backBtn").style.display = backLesson !== null ? "block" : "none";
+  if (id === "dashboard") renderProgress();
+  applyLock();
+  store.set("view", id);
+}
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+
+/* =========================================================
+   4. CONTROLS
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const sliders = {}; // key -> {range, num}
+
+function addSlider(parent, key, label, min, max, step){
+  const wrap = document.createElement("div"); wrap.className = "ctl";
+  wrap.innerHTML = `<label>${label}</label><input type="range" min="${min}" max="${max}" step="${step}"><input type="number" step="${step}">`;
+  const [, range, num] = wrap.children;
+  const set = v => {
+    let n = parseFloat(v);
+    if (!Number.isFinite(n)) n = DEFAULTS[key];       // invalid input falls back to default
+    n = Math.min(Math.max(n, min), max);
+    state[key] = n; range.value = n; num.value = n;
+    if (key === "sx" && $("uniform").checked) { state.sy = n; sliders.sy.range.value = n; sliders.sy.num.value = n; }
+    update();
+  };
+  range.oninput = () => set(range.value);
+  num.onchange = () => set(num.value);
+  range.value = num.value = state[key];
+  sliders[key] = { range, num, set };
+  parent.appendChild(wrap);
+}
+[["c-trans",[["tx","X",-20,20,0.5],["ty","Y",-20,20,0.5]]],
+ ["c-rot",[["rot","Angle °",-360,360,1]]],
+ ["c-scale",[["sx","X scale",-3,3,0.1],["sy","Y scale",-3,3,0.1]]],
+ ["c-shear",[["shx","Horizontal",-2,2,0.1],["shy","Vertical",-2,2,0.1]]],
+ ["c-pivot",[["px","Pivot X",-20,20,0.5],["py","Pivot Y",-20,20,0.5]]]
+].forEach(([box, list]) => list.forEach(a => addSlider($(box), ...a)));
+
+$("shape").onchange = e => { state.shape = e.target.value; resetPivot(); update(); };
+$("refl").onchange = e => { state.refl = e.target.value; update(); };
+document.querySelectorAll("[data-ang]").forEach(b => b.onclick = () => sliders.rot.set(b.dataset.ang));
+$("reset").onclick = () => {
+  Object.assign(state, DEFAULTS); const c = centroid2(state.shape); state.px = c[0]; state.py = c[1];
+  Object.keys(sliders).forEach(k => { sliders[k].range.value = sliders[k].num.value = state[k]; });
+  $("refl").value = "none"; $("uniform").checked = false; update();
+};
+$("save").onclick = () => {
+  const h = store.get("history", []);
+  const { shape, tx, ty, rot, sx, sy, shx, shy, refl } = state;
+  h.unshift({ t: new Date().toLocaleString(), shape, tx, ty, rot, sx, sy, shx, shy, refl });
+  store.set("history", h.slice(0, 50)); logAct("Saved a " + shape + " transformation");
+  $("save").textContent = "Saved"; setTimeout(() => $("save").textContent = "Save to history", 1200); toast("Saved to history");
+};
+
+/* =========================================================
+   5. DRAWING (2D canvas)
+   ========================================================= */
+const canvas = $("stage"), ctx = canvas.getContext("2d");
+const view = { r:10, ox:0, oy:0 }; // r = visible units from center to edge, (ox, oy) = center of the view (zoom and pan)
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function resizeCanvas(){
+  const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  canvas.width = Math.round(r.width * d); canvas.height = Math.round(r.height * d); // fills the whole box, width and height both follow the CSS size
+}
+function draw(){
+  if (!canvas.offsetParent) return;
+  resizeCanvas();
+  const W = canvas.width, H = canvas.height, u = H / (view.r * 2), dpr = W / canvas.getBoundingClientRect().width;
+  const X = x => W/2 + (x - view.ox) * u, Y = y => H/2 - (y - view.oy) * u;
+  const cx = X(0), cy = Y(0); // where the origin sits on screen
+  const fpx = Math.round(Math.min(Math.max(u * 0.4, 11 * dpr), 17 * dpr)); // text stays readable at any zoom
+  const step = view.r <= 14 ? 1 : view.r <= 30 ? 2 : view.r <= 70 ? 5 : 10; // grid spacing grows as you zoom out
+  const every = step * Math.max(1, Math.ceil(42 * dpr / (u * step))); // label spacing so numbers never overlap
+  const hr = view.r * W / H, xa = view.ox - hr, xb = view.ox + hr, ya = view.oy - view.r, yb = view.oy + view.r;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = `${fpx}px sans-serif`;
+  if (prefs.grid){
+    ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+    for (let i = Math.ceil(xa / step) * step; i <= xb; i += step){ ctx.beginPath(); ctx.moveTo(X(i), 0); ctx.lineTo(X(i), H); ctx.stroke(); }
+    for (let j = Math.ceil(ya / step) * step; j <= yb; j += step){ ctx.beginPath(); ctx.moveTo(0, Y(j)); ctx.lineTo(W, Y(j)); ctx.stroke(); }
+  }
+  if (prefs.axes){
+    ctx.strokeStyle = css("--muted"); ctx.lineWidth = 2; ctx.fillStyle = css("--muted");
+    const lx = Math.min(Math.max(cx + 6, 4), W - fpx * 3), ly = Math.min(Math.max(cy + fpx * 1.2, fpx * 1.5), H - 4); // number labels stay on screen when you pan
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+    for (let i = Math.ceil(xa / every) * every; i <= xb; i += every) if (i) ctx.fillText(i, X(i) - fpx * 0.3, ly);
+    for (let j = Math.ceil(ya / every) * every; j <= yb; j += every) if (j) ctx.fillText(j, lx, Y(j) + fpx * 0.35);
+    ctx.fillText("O", cx + 6, cy + fpx * 1.2);
+    ctx.font = `bold ${Math.round(fpx * 1.3)}px sans-serif`;
+    ctx.fillText("x", W - fpx * 1.8, Math.min(Math.max(cy, fpx * 2), H - 6) - 10); ctx.fillText("y", Math.min(Math.max(cx, 6), W - fpx * 2) + 10, fpx * 1.8);
+    ctx.font = `${fpx}px sans-serif`; ctx.beginPath(); // arrow heads
+    const a = fpx * 0.5;
+    ctx.moveTo(W, cy); ctx.lineTo(W - a*2, cy - a); ctx.lineTo(W - a*2, cy + a); ctx.moveTo(cx, 0); ctx.lineTo(cx - a, a*2); ctx.lineTo(cx + a, a*2); ctx.fill();
+  }
+  const base = SHAPES[state.shape]().map(([x, y]) => ({ x, y }));
+  const out = base.map(p => Mat.apply(finalMatrix(lerp2(state, anim2.t)), p));
+  const path = pts => { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(X(p.x), Y(p.y)) : ctx.moveTo(X(p.x), Y(p.y))); ctx.closePath(); };
+
+  ctx.setLineDash([8, 6]); ctx.strokeStyle = css("--teal"); ctx.lineWidth = 2.5; path(base); ctx.stroke(); ctx.setLineDash([]);
+  path(out); ctx.fillStyle = drag.id !== null ? "rgba(232,135,58,.55)" : "rgba(232,135,58,.35)"; ctx.fill(); ctx.strokeStyle = css("--orange"); ctx.stroke();
+  // point labels: A, B, C for the original (teal) and A', B', C' for the result (orange)
+  if ($("lbl2").checked && base.length >= 3 && base.length <= 12){
+    const bb = pts => { const xs = pts.map(q => X(q.x)), ys = pts.map(q => Y(q.y)); return Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)); };
+    const small = Math.min(bb(base), bb(out));                                      // size of the smaller shape on screen
+    const f = Math.round(Math.min(Math.max(small * 0.08, 10 * dpr), 13 * dpr));     // text size follows the shape, never huge
+    const full = small >= 60 * dpr;                                                  // too small for coordinates? show only the letter
+    const nm = i => String.fromCharCode(65 + i), t = n => (+n.toFixed(1)).toString();
+    const cen = pts => ({ x: pts.reduce((a, q) => a + X(q.x), 0) / pts.length, y: pts.reduce((a, q) => a + Y(q.y), 0) / pts.length });
+    const cb = cen(base), co = cen(out);
+    ctx.font = `${f}px Consolas, monospace`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.lineJoin = "round";
+    const taken = [];                                                                // boxes already used, so labels never sit on each other
+    const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const dot = (px, py) => taken.push({ x: px - 5 * dpr, y: py - 5 * dpr, w: 10 * dpr, h: 10 * dpr });
+    base.forEach(q => dot(X(q.x), Y(q.y))); out.forEach(q => dot(X(q.x), Y(q.y)));
+    const put = (q, c, texts, color) => {
+      const px = X(q.x), py = Y(q.y), a0 = Math.atan2(py - c.y, px - c.x);         // push the label away from the shape's middle
+      for (const text of texts){
+        const w = ctx.measureText(text).width, h = f * 1.25;
+        for (const d of [7 * dpr, 7 * dpr + f, 7 * dpr + 2.2 * f]) for (const da of [0, .7, -.7, 1.4, -1.4, 2.1, -2.1, Math.PI]){
+          const dx = Math.cos(a0 + da), dy = Math.sin(a0 + da), k = d + Math.abs(dx) * w / 2 + Math.abs(dy) * h / 2;
+          const box = { x: px + dx * k - w / 2, y: py + dy * k - h / 2, w, h };
+          if (box.x < 3 || box.y < 3 || box.x + w > W - 3 || box.y + h > H - 3 || taken.some(r => hit(r, box))) continue;
+          taken.push(box); ctx.lineWidth = 3 * dpr; ctx.strokeStyle = css("--panel"); ctx.strokeText(text, box.x, box.y);
+          ctx.fillStyle = color; ctx.fillText(text, box.x, box.y); return;
+        }
+      }
+    };
+    base.forEach((q, i) => { ctx.fillStyle = css("--teal"); ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), 3 * dpr, 0, 7); ctx.fill(); });
+    out.forEach((q, i) => { ctx.fillStyle = css("--orange"); ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), 4 * dpr, 0, 7); ctx.fill(); });
+    out.forEach((q, i) => put(q, co, full ? [`${nm(i)}'(${t(q.x)}, ${t(q.y)})`, `${nm(i)}'`] : [`${nm(i)}'`], css("--orange")));
+    base.forEach((q, i) => put(q, cb, full ? [`${nm(i)}(${t(q.x)}, ${t(q.y)})`, `${nm(i)}`] : [`${nm(i)}`], css("--teal")));
+    ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+  }
+  if (lock.on){ ctx.font = `${Math.round(13 * dpr)}px sans-serif`; ctx.fillStyle = css("--muted"); ctx.textAlign = "left"; ctx.fillText("🔒 Position locked", 12 * dpr, 22 * dpr); }
+  // pivot marker
+  const sh = lerp2(state, anim2.t), pv = Mat.apply(Mat.mul(Mat.translate(sh.tx, sh.ty), Mat.reflect(sh.refl)), { x: state.px, y: state.py });
+  ctx.fillStyle = css("--cyan"); ctx.beginPath(); ctx.arc(X(pv.x), Y(pv.y), 5, 0, 7); ctx.fill();
+  // points of a shape that is being drawn right now
+  if (drawing.pts.length){
+    ctx.strokeStyle = css("--cyan"); ctx.lineWidth = 2; ctx.beginPath();
+    drawing.pts.forEach((q, i) => i ? ctx.lineTo(X(q[0]), Y(q[1])) : ctx.moveTo(X(q[0]), Y(q[1]))); ctx.stroke();
+    ctx.fillStyle = css("--orange"); drawing.pts.forEach(q => { ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), 6, 0, 7); ctx.fill(); });
+  }
+}
+
+/* =========================================================
+   6. TABLES AND MATRIX DISPLAY
+   ========================================================= */
+const fmt = n => (Math.abs(n) < 1e-9 ? 0 : n).toFixed(2);
+const matHTML = m => `<div class="mat">${m.flat().map(v => `<span>${fmt(v)}</span>`).join("")}</div>`;
+// ----- live numbers box (matrix + position + points) -----
+function hudMatrix(rows){ // orange numbers differ from the identity matrix, so you see what actually changed
+  const n = rows.length;
+  return `<div class="mx" style="grid-template-columns:repeat(${n},auto)">${rows.map((r, i) => r.map((v, j) => `<span class="${Math.abs(v - (i === j ? 1 : 0)) > 1e-9 ? "v" : ""}">${fmt(v)}</span>`).join("")).join("")}</div>`;
+}
+
+
+function renderTables(){
+  const base = SHAPES[state.shape]().map(([x, y]) => ({ x, y }));
+  const M = finalMatrix(state);
+  // circles have 40 points, so only list the first 8 to keep it readable
+  const rows = base.slice(0, 8).map((p, i) => { const q = Mat.apply(M, p);
+    return `<tr><td>P${i+1}</td><td>(${fmt(p.x)}, ${fmt(p.y)})</td><td>(${fmt(q.x)}, ${fmt(q.y)})</td></tr>`; }).join("");
+  $("coords").innerHTML = `<tr><th>Point</th><th>Original</th><th>Transformed</th></tr>${rows}`;
+  $("matBox1").innerHTML = matHTML(M);
+  const pts = base.slice(0, 4).map((p, i) => { const q = Mat.apply(M, p); return `<div><b>P${i+1}</b>${fmt(q.x)}, ${fmt(q.y)}</div>`; });
+  $("hud2").innerHTML = `<div class="hh"><span><i></i>Live</span><em>Matrix 3×3</em></div>${hudMatrix(M)}`
+    + `<div class="chips"><span class="chip"><b>Move</b>${fmt(state.tx)}, ${fmt(state.ty)}</span><span class="chip"><b>Rot</b>${+(+state.rot).toFixed(1)}°</span></div>`
+    + `<div class="pts">${pts.join("")}</div>`;
+}
+function renderMatrixPage(){
+  const steps = buildSteps(state);
+  $("matSteps").innerHTML = steps.map(s => `<h3>${s.name}</h3>${matHTML(s.m)}`).join("")
+    + `<h3>Final = Translate × Rotate × Reflect × Shear × Scale</h3>${matHTML(finalMatrix(state))}`;
+}
+function renderHistory(){
+  const h = store.get("history", []);
+  $("histList").innerHTML = h.length ? h.map((e, i) => `<li><span>${e.t}: ${e.shape}, move (${e.tx}, ${e.ty}), rotate ${e.rot}°, scale (${e.sx}, ${e.sy}), shear (${e.shx}, ${e.shy}), reflect ${e.refl}</span><span class="row"><button class="btn" data-load="${i}">Load</button><button class="btn" data-del="${i}" aria-label="Delete">×</button></span></li>`).join("")
+    : `<li>Nothing saved yet. Use "Save to history" in the 2D lab.</li>`;
+}
+$("histList").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const h = store.get("history", []);
+  if (b.dataset.del !== undefined){ h.splice(+b.dataset.del, 1); store.set("history", h); renderHistory(); toast("Entry deleted"); }
+  if (b.dataset.load !== undefined){
+    const x = h[+b.dataset.load], shape = x.shape === "custom" && !customPts ? "square" : x.shape;
+    setState2({ shape, tx:x.tx, ty:x.ty, rot:x.rot, sx:x.sx, sy:x.sy, shx:x.shx, shy:x.shy, refl:x.refl }); go("2d"); toast("Loaded into the 2D lab");
+  }
+};
+$("clearHist").onclick = () => { if (!confirm("Clear all saved transformations?")) return; store.set("history", []); renderHistory(); toast("History cleared"); };
+function renderProgress(){ renderDash(); }
+
+function update(){
+  draw(); renderTables(); showDetected();
+  if ($("v-matrix").classList.contains("on")) renderMatrixPage();
+}
+
+/* =========================================================
+   7. SETTINGS
+   ========================================================= */
+function applyPrefs(){
+  document.documentElement.dataset.theme = prefs.theme;
+  $("themeTog").checked = prefs.theme === "dark"; $("themeSw").checked = prefs.theme === "dark"; $("gridToggle").checked = prefs.grid; $("axesToggle").checked = prefs.axes; $("spd").value = prefs.speed || 1;
+  $("defShape").value = prefs.shape || "square";
+  if (grid3) grid3.visible = prefs.grid; if (axes3) axes3.visible = prefs.axes; // the same switches control the 3D scene
+  $("grid3c").checked = prefs.grid; $("axes3c").checked = prefs.axes;
+  store.set("prefs", prefs); draw(); drawCmp();
+}
+$("themeTog").onchange = e => { prefs.theme = e.target.checked ? "dark" : "light"; applyPrefs(); };
+$("defShape").onchange = e => { prefs.shape = e.target.value; applyPrefs(); toast("Start shape saved"); };
+$("gridToggle").onchange = e => { prefs.grid = e.target.checked; applyPrefs(); };
+$("axesToggle").onchange = e => { prefs.axes = e.target.checked; applyPrefs(); };
+$("spd").onchange = e => { prefs.speed = +e.target.value; applyPrefs(); };
+$("resetPrefs").onclick = () => { prefs = { theme:"dark", grid:true, axes:true, speed:1, shape:"square" }; applyPrefs(); toast("Preferences reset"); };
+
+/* =========================================================
+   8. DASHBOARD DEMO (spinning square driven by the same Mat code)
+   ========================================================= */
+const demo = $("demo"), dctx = demo.getContext("2d");
+let angle = 0;
+function spin(){
+  dctx.clearRect(0, 0, 260, 160);
+  const m = Mat.mul(Mat.translate(130, 80), Mat.rotate(-angle)); // minus because canvas y points down
+  dctx.beginPath();
+  SHAPES.square().forEach(([x, y], i) => { const p = Mat.apply(m, { x: x*28, y: y*28 }); i ? dctx.lineTo(p.x, p.y) : dctx.moveTo(p.x, p.y); });
+  dctx.closePath(); dctx.fillStyle = "rgba(43,179,166,.35)"; dctx.fill(); dctx.strokeStyle = css("--teal"); dctx.lineWidth = 2; dctx.stroke();
+  angle = (angle + 0.8) % 360;
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) requestAnimationFrame(spin);
+}
+
+/* =========================================================
+   8b. ANIMATION HELPER + 2D EXTRAS
+   t goes 0 to 1 and every parameter is interpolated, so the motion is the real transform
+   ========================================================= */
+const makeAnim = cb => {
+  const a = { t: 1, id: 0,
+    play(){ cancelAnimationFrame(a.id); if (a.t >= 1) a.t = 0;
+      const f = () => { a.t = Math.min(1, a.t + 0.008 * (+prefs.speed || 1)); cb(); if (a.t < 1) a.id = requestAnimationFrame(f); }; f(); },
+    pause(){ cancelAnimationFrame(a.id); },
+    reset(){ cancelAnimationFrame(a.id); a.t = 1; cb(); } };
+  return a;
+};
+const anim2 = makeAnim(() => update());
+const lerp2 = (s, t) => ({ ...s, tx:s.tx*t, ty:s.ty*t, rot:s.rot*t, sx:1+(s.sx-1)*t, sy:1+(s.sy-1)*t, shx:s.shx*t, shy:s.shy*t, refl: t >= 1 ? s.refl : "none" });
+$("play2").onclick = () => anim2.play(); $("pause2").onclick = () => anim2.pause(); $("rst2").onclick = () => anim2.reset();
+$("reset").addEventListener("click", () => toast("2D lab reset"));
+function resetPivot(){
+  const c = centroid2(state.shape); state.px = c[0]; state.py = c[1];
+  ["px", "py"].forEach(k => sliders[k].range.value = sliders[k].num.value = state[k]);
+}
+function setState2(patch){
+  Object.assign(state, DEFAULTS, { shape: "square" }, patch);
+  if (!("px" in patch) && !("py" in patch)){ const c = centroid2(state.shape); state.px = c[0]; state.py = c[1]; } // pivot at the shape's center
+  Object.keys(sliders).forEach(k => sliders[k].range.value = sliders[k].num.value = state[k]);
+  $("refl").value = state.refl; $("shape").value = state.shape; update();
+}
+const PRE2 = { sq:{ shape:"square", rot:45 }, tri:{ shape:"triangle", tx:4, ty:2 }, rect:{ shape:"rect", sx:2, sy:1.5 }, refl:{ shape:"triangle", shx:1, refl:"y" } };
+$("pre2").onchange = e => { if (PRE2[e.target.value]) setState2(PRE2[e.target.value]); };
+
+/* =========================================================
+   8c. 3D LAB (Three.js). Matrix is built by hand, then handed to the mesh.
+   ========================================================= */
+const D3 = { tx:0, ty:0, tz:0, rx:0, ry:0, rz:0, sx:1, sy:1, sz:1, hxy:0, hxz:0, hyx:0, ref:"none", order:"XYZ" };
+const S3 = { ...D3 }, sl3 = {};
+// 3D sliders that are shared with the 2D lab when the shape is linked (same xy plane)
+const MAP3 = { rz:"rot", sx:"sx", sy:"sy", hxy:"shx", hyx:"shy" };
+let scene, cam, ren, ctl3, mesh, ghost, grid3, axes3, ready3 = false;
+const rad = d => d * Math.PI / 180;
+function matrix3(s, t = 1){
+  const L = (v, base) => base + (v - base) * t;
+  const T = new THREE.Matrix4().makeTranslation(s.tx*t, s.ty*t, s.tz*t);
+  const R = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rad(s.rx*t), rad(s.ry*t), rad(s.rz*t), s.order));
+  const f = 1 - 2*t; // 1 down to -1, so reflection animates as a real flip
+  const F = new THREE.Matrix4().makeScale(s.ref === "yz" ? f : 1, s.ref === "xz" ? f : 1, s.ref === "xy" ? f : 1);
+  const H = new THREE.Matrix4().set(1, s.hxy*t, s.hxz*t, 0,  s.hyx*t, 1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1);
+  const Sc = new THREE.Matrix4().makeScale(L(s.sx, 1), L(s.sy, 1), L(s.sz, 1));
+  return T.multiply(R).multiply(F).multiply(H).multiply(Sc);
+}
+const anim3 = makeAnim(() => update3());
+function geo3(n){
+  return { cube:() => new THREE.BoxGeometry(2,2,2), sphere:() => new THREE.SphereGeometry(1.2,32,24), cone:() => new THREE.ConeGeometry(1,2,32),
+    cylinder:() => new THREE.CylinderGeometry(1,1,2,32), pyramid:() => new THREE.ConeGeometry(1.4,2,4), torus:() => new THREE.TorusGeometry(1,0.4,16,40), from2d: extrude2d }[n]();
+}
+[["tx","Move X",-20,20,.5],["ty","Move Y",-20,20,.5],["tz","Move Z",-20,20,.5],["rx","Rot X",-360,360,1],["ry","Rot Y",-360,360,1],["rz","Rot Z",-360,360,1],
+ ["sx","Scale X",-3,3,.1],["sy","Scale Y",-3,3,.1],["sz","Scale Z",-3,3,.1],["hxy","Shear x/y",-2,2,.1],["hxz","Shear x/z",-2,2,.1],["hyx","Shear y/x",-2,2,.1]]
+.forEach(([k, label, min, max, step]) => {
+  const w = document.createElement("div"); w.className = "ctl";
+  w.innerHTML = `<label>${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${S3[k]}"><input type="number" step="${step}" value="${S3[k]}">`;
+  const [, r, n] = w.children;
+  const set = v => {
+    let x = parseFloat(v); if (!Number.isFinite(x)) x = D3[k];
+    x = Math.min(Math.max(x, min), max);
+    if ($("link3").checked && MAP3[k]){ // write into the 2D lab so both always agree
+      const sk = MAP3[k]; state[sk] = x; sliders[sk].range.value = sliders[sk].num.value = x;
+    } else S3[k] = x;
+    r.value = n.value = x; update3();
+  };
+  r.oninput = () => set(r.value); n.onchange = () => set(n.value); sl3[k] = { r, n };
+  $("c3").appendChild(w);
+});
+function syncUI3(){
+  const linked = $("link3").checked;
+  Object.keys(sl3).forEach(k => sl3[k].r.value = sl3[k].n.value = (linked && MAP3[k]) ? state[MAP3[k]] : S3[k]);
+  $("ref3").value = S3.ref; $("ord3").value = S3.order;
+}
+function setObj3(){
+  [mesh, ghost].forEach(m => { if (m){ scene.remove(m); m.geometry.dispose(); } });
+  const g = geo3($("obj3").value);
+  mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color:$("col3").value, side:THREE.DoubleSide, wireframe:$("wire3").checked }));
+  mesh.matrixAutoUpdate = false;
+  ghost = new THREE.Mesh(g.clone(), new THREE.MeshBasicMaterial({ color:0x2bb3a6, wireframe:true }));
+  ghost.visible = $("orig3").checked; scene.add(mesh, ghost); buildVertexLabels(g); update3();
+}
+function update3(){
+  if (!mesh) return;
+  // 2D result first, then the 3D controls on top
+  const m = matrix3(S3, anim3.t).multiply(lift2d(anim3.t));
+  mesh.matrix.copy(m); mesh.matrixWorldNeedsUpdate = true;
+  moveVertexLabels(m);
+  const e = m.elements; // column major, so row i col j is e[j*4+i]
+  $("hud3").innerHTML = `<div class="hh"><span><i></i>Live</span><em>Matrix 4×4</em></div>${hudMatrix([0,1,2,3].map(i => [0,1,2,3].map(j => e[j*4+i])))}`
+    + `<div class="chips"><span class="chip"><b>Position</b>${fmt(e[12])}, ${fmt(e[13])}, ${fmt(e[14])}</span></div>`;
+  $("mat4").innerHTML = '<div class="mat mat4">' + [0,1,2,3].flatMap(i => [0,1,2,3].map(j => `<span>${fmt(e[j*4+i])}</span>`)).join("") + "</div>";
+}
+function resetCam(){ cam.position.set(10, 8, 13); ctl3.target.set(0, 0, 0); ctl3.update(); fitCam(); }
+function show3(){
+  syncLink();
+  if (!ready3){
+    const box = $("stage3");
+    if (typeof THREE === "undefined" || !THREE.OrbitControls){ box.innerHTML = '<p class="soon">Three.js did not load. Put three.min.js and OrbitControls.js in the same folder as this file (see the About page), or connect to the internet once, then reload.</p>'; return; }
+    scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(50, 1, .1, 100);
+    ren = new THREE.WebGLRenderer({ antialias:true, alpha:true }); box.appendChild(ren.domElement); bind3Drag(ren.domElement);
+    ctl3 = new THREE.OrbitControls(cam, ren.domElement);
+    scene.add(new THREE.AmbientLight(0xffffff, .55)); const dl = new THREE.DirectionalLight(0xffffff, .8); dl.position.set(5, 8, 6); scene.add(dl);
+    grid3 = new THREE.GridHelper(20, 20, 0x8fa0ba, 0x2a3955); axes3 = new THREE.AxesHelper(6); scene.add(grid3, axes3); addAxisLabels(); grid3.visible = prefs.grid; axes3.visible = prefs.axes;
+    new ResizeObserver(() => requestAnimationFrame(() => { const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return; ren.setSize(w, h); cam.aspect = w/h; cam.updateProjectionMatrix(); })).observe(box);
+    resetCam(); setObj3(); ready3 = true;
+    (function loop(){ requestAnimationFrame(loop); if (box.offsetParent){ try { ctl3.update(); ren.render(scene, cam); placeLabels(box); } catch (err){ console.error("3D frame failed:", err); } } })();
+  }
+}
+$("obj3").onchange = () => { $("link3").checked = false; unlink3(); if (ready3) setObj3(); };
+$("col3").oninput = () => mesh && mesh.material.color.set($("col3").value);
+$("wire3").onchange = () => mesh && (mesh.material.wireframe = $("wire3").checked);
+$("ref3").onchange = e => { S3.ref = e.target.value; update3(); };
+$("ord3").onchange = e => { S3.order = e.target.value; update3(); };
+$("orig3").onchange = e => ghost && (ghost.visible = e.target.checked);
+$("axes3c").onchange = e => axes3 && (axes3.visible = e.target.checked);
+$("grid3c").onchange = e => grid3 && (grid3.visible = e.target.checked);
+$("play3").onclick = () => anim3.play(); $("pause3").onclick = () => anim3.pause(); $("rst3").onclick = () => anim3.reset();
+$("resetObj3").onclick = () => { Object.assign(S3, D3); if ($("link3").checked) setState2({ shape: state.shape }); syncUI3(); anim3.reset(); };
+$("resetCam3").onclick = () => ready3 && resetCam();
+function setState3(patch, obj){
+  Object.assign(S3, D3, patch); syncUI3(); if (obj){ $("link3").checked = false; $("obj3").value = obj; if (ready3) setObj3(); } update3();
+}
+const PRE3 = { cube:[{ rx:45, ry:45 }, "cube"], sphere:[{ sx:1.5, sy:.6, sz:1.5 }, "sphere"], move:[{ tx:2, ty:1, tz:-2 }, "cube"] };
+$("pre3").onchange = e => { const p = PRE3[e.target.value]; if (p) setState3(p[0], p[1]); };
+
+/* =========================================================
+   8d. SEQUENCES AND COMPARE
+   ========================================================= */
+let seq = store.get("seq", [{ t:"move", a:3, b:0 }, { t:"rotate", a:90, b:0 }]);
+const undoS = [], redoS = [];
+const animC = makeAnim(() => drawCmp());
+function stepMat(s, t = 1){
+  const a = +s.a || 0, b = +s.b || 0;
+  switch (s.t){
+    case "move": return Mat.translate(a*t, b*t);
+    case "rotate": return Mat.rotate(a*t);
+    case "scale": return Mat.scale(1+(a-1)*t, 1+(b-1)*t);
+    case "shear": return Mat.shear(a*t, b*t);
+    case "reflectX": return Mat.scale(1, 1-2*t);
+    case "reflectY": return Mat.scale(1-2*t, 1);
+    default: return Mat.scale(1-2*t, 1-2*t);
+  }
+}
+function seqMatrix(list, t = 1){
+  const p = t * list.length; // overall progress is split across the steps
+  return list.reduce((acc, s, i) => Mat.mul(stepMat(s, Math.min(1, Math.max(0, p - i))), acc), Mat.identity());
+}
+const SEQ_UI = { move:{ a:3, b:0, pa:"x", pb:"y" }, rotate:{ a:90, pa:"deg" }, scale:{ a:2, b:2, pa:"x", pb:"y" }, shear:{ a:1, b:0, pa:"x", pb:"y" }, reflectX:{}, reflectY:{}, reflectO:{} };
+function seqLabel(s){ // short, readable text for each step (no useless second number)
+  const n = v => +(+v).toFixed(2);
+  switch (s.t){
+    case "move": return `Move (${n(s.a)}, ${n(s.b)})`;
+    case "rotate": return `Rotate ${n(s.a)}°`;
+    case "scale": return `Scale (${n(s.a)}, ${n(s.b)})`;
+    case "shear": return `Shear (${n(s.a)}, ${n(s.b)})`;
+    case "reflectX": return "Reflect X axis";
+    case "reflectY": return "Reflect Y axis";
+    default: return "Reflect origin";
+  }
+}
+function syncStInputs(){ // show only the boxes this step needs, with sensible starting values
+  const c = SEQ_UI[$("stType").value] || {};
+  $("stA").style.display = c.pa ? "" : "none"; $("stB").style.display = c.pb ? "" : "none";
+  if (c.pa){ $("stA").value = c.a; $("stA").placeholder = c.pa; }
+  if (c.pb){ $("stB").value = c.b; $("stB").placeholder = c.pb; }
+}
+$("stType").onchange = syncStInputs;
+function renderSeq(){
+  $("seqList").innerHTML = seq.map((s, i) => `<li>${seqLabel(s)}<button class="btn" data-a="up" data-i="${i}">↑</button><button class="btn" data-a="dn" data-i="${i}">↓</button><button class="btn" data-a="rm" data-i="${i}">×</button></li>`).join("") || "<li>No steps yet. Add one above.</li>";
+  $("seqMat").innerHTML = matHTML(seqMatrix(seq));
+}
+function changeSeq(fn){ undoS.push(JSON.stringify(seq)); redoS.length = 0; fn(); store.set("seq", seq); renderSeq(); drawCmp(); }
+$("stAdd").onclick = () => { const c = SEQ_UI[$("stType").value] || {}, a = c.pa ? parseFloat($("stA").value) : 0, b = c.pb ? parseFloat($("stB").value) : 0;
+  changeSeq(() => seq.push({ t:$("stType").value, a:Number.isFinite(a) ? a : 0, b:Number.isFinite(b) ? b : 0 })); };
+$("seqList").onclick = e => { const b = e.target.closest("button"); if (!b) return; const i = +b.dataset.i;
+  changeSeq(() => { if (b.dataset.a === "rm") seq.splice(i, 1);
+    else { const j = b.dataset.a === "up" ? i-1 : i+1; if (j >= 0 && j < seq.length) [seq[i], seq[j]] = [seq[j], seq[i]]; } }); };
+$("stUndo").onclick = () => { if (!undoS.length) return; redoS.push(JSON.stringify(seq)); seq = JSON.parse(undoS.pop()); store.set("seq", seq); renderSeq(); drawCmp(); };
+$("stRedo").onclick = () => { if (!redoS.length) return; undoS.push(JSON.stringify(seq)); seq = JSON.parse(redoS.pop()); store.set("seq", seq); renderSeq(); drawCmp(); };
+$("stClear").onclick = () => changeSeq(() => { seq = []; });
+$("playC").onclick = () => animC.play(); $("pauseC").onclick = () => animC.pause(); $("rstC").onclick = () => animC.reset();
+$("cmpShape").onchange = () => drawCmp(); $("showOrig").onchange = () => drawCmp();
+function drawCmp(){
+  const c = $("cmp"); if (!c.offsetParent) return;
+  const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; c.width = Math.round(r.width * d); c.height = Math.round(r.height * d);
+  const g = c.getContext("2d"), W = c.width, H = c.height, t = animC.t;
+  const base = SHAPES[$("cmpShape").value]().map(([x, y]) => ({ x, y }));
+  // auto-fit: zoom and center so the original, your order and the reversed order are all in view
+  const all = [base, base.map(q => Mat.apply(seqMatrix(seq, 1), q)), base.map(q => Mat.apply(seqMatrix(seq.slice().reverse(), 1), q)), [{ x: 0, y: 0 }]].flat();
+  const bx0 = Math.min(...all.map(q => q.x)), bx1 = Math.max(...all.map(q => q.x)), by0 = Math.min(...all.map(q => q.y)), by1 = Math.max(...all.map(q => q.y));
+  const u = Math.min(W / (bx1 - bx0 + 4), H / (by1 - by0 + 4), Math.min(W, H) / 16), mx = (bx0 + bx1) / 2, my = (by0 + by1) / 2;
+  const X = x => W / 2 + (x - mx) * u, Y = y => H / 2 - (y - my) * u, cx = X(0), cy = Y(0);
+  const step = u >= 16 * d ? 1 : u >= 8 * d ? 2 : u >= 4 * d ? 5 : 10, every = step * Math.max(1, Math.ceil(38 * d / (u * step)));
+  g.clearRect(0, 0, W, H); g.lineWidth = 1; g.strokeStyle = css("--line");
+  const gx0 = Math.floor((mx - W / 2 / u) / step) * step, gx1 = mx + W / 2 / u, gy0 = Math.floor((my - H / 2 / u) / step) * step, gy1 = my + H / 2 / u;
+  if (prefs.grid){ g.beginPath(); for (let i = gx0; i <= gx1; i += step){ g.moveTo(X(i), 0); g.lineTo(X(i), H); } for (let j = gy0; j <= gy1; j += step){ g.moveTo(0, Y(j)); g.lineTo(W, Y(j)); } g.stroke(); }
+  if (prefs.axes){
+    g.strokeStyle = css("--muted"); g.lineWidth = 2; g.beginPath(); g.moveTo(0, cy); g.lineTo(W, cy); g.moveTo(cx, 0); g.lineTo(cx, H); g.stroke();
+    g.fillStyle = css("--muted"); g.font = `${11 * d}px sans-serif`; g.textBaseline = "top"; g.textAlign = "center";
+    const ty = Math.min(Math.max(cy + 4 * d, 2), H - 16 * d), tx = Math.min(Math.max(cx - 6 * d, 4 * d), W - 30 * d);
+    for (let i = Math.ceil(gx0 / every) * every; i <= gx1; i += every) if (i) g.fillText(i, X(i), ty);
+    g.textAlign = "right"; for (let j = Math.ceil(gy0 / every) * every; j <= gy1; j += every) if (j) g.fillText(j, tx, Y(j) - 6 * d);
+    g.textAlign = "start"; g.textBaseline = "alphabetic";
+  }
+  const path = pts => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.closePath(); };
+  const show = $("showOrig").checked;
+  if (show){ g.setLineDash([8 * d, 6 * d]); g.strokeStyle = css("--teal"); g.lineWidth = 2 * d; path(base); g.stroke(); g.setLineDash([]); }
+  path(base.map(p => Mat.apply(seqMatrix(seq.slice().reverse(), t), p))); g.strokeStyle = css("--cyan"); g.lineWidth = 3 * d; g.stroke();
+  path(base.map(p => Mat.apply(seqMatrix(seq, t), p))); g.fillStyle = "rgba(232,135,58,.35)"; g.fill(); g.strokeStyle = css("--orange"); g.stroke();
+  // legend: tells you which color is which
+  const items = [[css("--orange"), "Your order", false, true], [css("--cyan"), "Reversed order", false, false]];
+  if (show) items.unshift([css("--teal"), "Original", true, false]);
+  const f = 12 * d, pad = 9 * d, rowH = f * 1.7; g.font = `${f}px system-ui, sans-serif`; g.textBaseline = "middle";
+  const w = Math.max(...items.map(it => g.measureText(it[1]).width)) + pad * 2 + 30 * d, h = items.length * rowH + pad * 1.2, x0 = 12 * d, y0 = 12 * d;
+  g.fillStyle = css("--panel"); g.globalAlpha = .92; g.beginPath(); if (g.roundRect) g.roundRect(x0, y0, w, h, 10 * d); else g.rect(x0, y0, w, h); g.fill(); g.globalAlpha = 1;
+  g.strokeStyle = css("--line"); g.lineWidth = d; g.stroke();
+  items.forEach((it, i) => {
+    const yy = y0 + pad * .6 + rowH * (i + .5), x1 = x0 + pad;
+    g.setLineDash(it[2] ? [5 * d, 4 * d] : []); g.strokeStyle = it[0]; g.lineWidth = 3 * d; g.beginPath(); g.moveTo(x1, yy); g.lineTo(x1 + 20 * d, yy); g.stroke(); g.setLineDash([]);
+    g.fillStyle = css("--text"); g.textAlign = "left"; g.fillText(it[1], x1 + 28 * d, yy);
+  });
+  g.textBaseline = "alphabetic";
+}
+
+/* =========================================================
+   8e. LEARNING CENTER
+   [title, definition, formula, explanation, example, common mistake, try-it]
+   ========================================================= */
+const LESSONS = [
+ ["What Is a Transformation?","A transformation changes where a shape is, how big it is, or which way it faces. The same rule is used on every corner.","P' = M · P","Pick a shape, then pick a change. TransformLab sends every corner through the same rule, so the whole shape moves together.","Slide a square 3 units to the right and every corner moves 3 units to the right.","Thinking only one corner moves. All corners move.",["2d",{ tx:3 }],"Easy",["Pick a shape.","Choose a change such as move, resize, or turn.","Every corner follows the same rule, so the shape stays in one piece."]],
+ ["Translation (Moving)","Moving every point the same distance in the same direction. Nothing is turned or resized.","(x', y') = (x + a, y + b)","Add a to every x value and b to every y value. Size, shape, and angles stay the same.","Move the point (1, 1) by (4, 2). The new point is (5, 3).","Subtracting when you want to go right. Positive x is right and positive y is up.",["2d",{ tx:4, ty:2 }],"Easy",["Decide how far to go right (a) and up (b).","Add a to the x value of each corner.","Add b to the y value of each corner."]],
+ ["Scaling (Resizing)","Making a shape bigger or smaller by multiplying its coordinates.","(x', y') = (sx · x, sy · y)","A factor above 1 makes the shape bigger. A factor between 0 and 1 makes it smaller. Different x and y factors stretch the shape.","Scale the point (3, 2) by 2. The new point is (6, 4).","Forgetting that scaling around the origin also moves the shape away. Use a pivot point to keep it in place.",["2d",{ sx:2, sy:2 }],"Easy",["Pick a scale factor for x and y.","Multiply the x value of each corner by sx.","Multiply the y value of each corner by sy."]],
+ ["Rotation (Turning)","Turning a shape around a pivot point by an angle.","x' = x cosθ − y sinθ and y' = x sinθ + y cosθ","A positive angle turns the shape counterclockwise. The pivot point stays still while everything else goes around it.","Rotate the point (2, 0) by 90°. The new point is (0, 2).","Forgetting the pivot point, or mixing up degrees and radians.",["2d",{ rot:90 }],"Easy",["Pick the angle and the pivot point.","Find cosθ and sinθ for the angle.","Put each corner into the two formulas to get its new place."]],
+ ["Reflection (Flipping)","Flipping a shape across a line, like a mirror.","Across the x axis: (x, y) becomes (x, −y). Across the y axis: (x, y) becomes (−x, y).","Points on the mirror line stay where they are. Every other point jumps to the same distance on the other side.","Reflect (3, 5) across the y axis. The new point is (−3, 5).","Flipping the wrong sign. Across the x axis changes y, not x.",["2d",{ shape:"triangle", shx:1, refl:"y" }],"Easy",["Pick the mirror line (x axis, y axis, or origin).","Change the sign of the coordinate that the line flips.","Draw the new corners and connect them."]],
+ ["Shearing (Slanting)","Slanting a shape so it leans, like pushing the top of a stack of cards sideways.","x' = x + k · y","Each point slides sideways by an amount that depends on its height. The area stays the same but the angles change.","Shear the point (1, 1) with k = 2. The new point is (3, 1).","Expecting right angles to stay right. Shearing changes angles.",["2d",{ shx:1 }],"Medium",["Pick the shear amount k.","Add k times y to each x value (horizontal shear).","Keep y the same and draw the leaning shape."]],
+ ["Homogeneous Coordinates","Writing each point with an extra 1, so moving a shape can also be done with a matrix.","(x, y) becomes (x, y, 1)","With the extra 1, translation, rotation, scaling, reflection, and shear can all use one kind of multiplication.","The point (2, 3) becomes (2, 3, 1).","Leaving out the extra 1. Without it, translation cannot be a matrix.",["matrix",{ rot:90, tx:2 }],"Medium",["Write the point as a column with a 1 at the bottom.","Build a 3×3 matrix for the change.","Multiply the matrix by the column."]],
+ ["2D Transformation Matrices","A 3×3 matrix that does a whole transformation in one multiplication.","[x' y' 1]ᵀ = M · [x y 1]ᵀ","Each transformation has its own matrix. Multiply the matrices together to combine steps into one.","Translation by (3, 2) is [[1,0,3],[0,1,2],[0,0,1]].","Multiplying in the wrong order.",["matrix",{ rot:90, tx:2 }],"Medium",["Pick the matrix for each step.","Multiply them in order to get one final matrix.","Multiply the final matrix by each corner."]],
+ ["Transformation Order","Doing the same steps in a different order can give a different result.","A · B is not the same as B · A","Move right then rotate 90° ends in a different place than rotate 90° then move right.","Open the Compare page and flip the order of two steps.","Assuming the order never matters.",["compare",null],"Medium",["Add two steps, for example move then rotate.","Look at the orange shape (your order) and the cyan shape (reverse order).","Notice they end in different places."]],
+ ["3D Transformation Matrices","A 4×4 matrix that does the same job in three dimensions, with an extra z value.","[x' y' z' 1]ᵀ = M · [x y z 1]ᵀ","Rotation can happen around the x, y, or z axis. Reflection happens across a plane.","Scaling z by 2 only stretches the object up and down.","Forgetting that the order of rotations changes the result.",["3d",{ rx:45, ry:45 }],"Medium",["Pick the object and the change.","Build a 4×4 matrix for each step.","Multiply them and apply the result to every corner."]]
+];
+let lesson = 0, lessonView = false, pendingOpen = false, backLesson = null;
+function openLesson(i){ lesson = i; lessonView = true; pendingOpen = true; go("learn"); }
+// short blurb and reading time for each lesson card
+const META = [["See how one rule moves a whole shape.",3],["Slide a shape without turning or resizing it.",3],["Make shapes bigger or smaller.",3],["Turn a shape around a point.",4],["Flip a shape like a mirror.",3],["Slant a shape sideways.",3],["Why every point gets an extra 1.",4],["Do a whole change in one multiplication.",5],["See why the order of steps matters.",4],["Move from 2D matrices to 3D.",5]];
+const lp = (k, label, min, max, step, val) => ({ k, label, min, max, step, val });
+// the small live demo inside each lesson: sliders in, one 3x3 matrix out
+const DEMOS = [
+ { params:[lp("tx","Move right",-5,5,.5,3)], build: v => ({ main: Mat.translate(v.tx, 0) }) },
+ { params:[lp("tx","Move right",-5,5,.5,3), lp("ty","Move up",-5,5,.5,2)], build: v => ({ main: Mat.translate(v.tx, v.ty) }) },
+ { params:[lp("sx","Scale x",-3,3,.1,2), lp("sy","Scale y",-3,3,.1,2)], build: v => ({ main: Mat.scale(v.sx, v.sy) }) },
+ { params:[lp("a","Angle (degrees)",-180,180,5,45)], build: v => ({ main: Mat.rotate(v.a) }) },
+ { pts:[[1,1],[4,1],[1,3]], params:[{ k:"r", label:"Flip across", opts:[["x","the x axis"],["y","the y axis"],["o","the origin"],["none","nothing"]], val:"y" }], build: v => ({ main: Mat.reflect(v.r) }) },
+ { params:[lp("k","Shear k",-2,2,.1,1)], build: v => ({ main: Mat.shear(v.k, 0) }) },
+ { readout:true, params:[lp("tx","Move right",-5,5,.5,2), lp("ty","Move up",-5,5,.5,1)], build: v => ({ main: Mat.translate(v.tx, v.ty) }) },
+ { params:[lp("a","Angle (degrees)",-180,180,5,90), lp("tx","Move right",-5,5,.5,2)], build: v => ({ main: Mat.mul(Mat.translate(v.tx, 0), Mat.rotate(v.a)) }) },
+ { alt:true, params:[lp("tx","Move right",-5,5,.5,3), lp("a","Angle (degrees)",-180,180,5,90)], build: v => ({ main: Mat.mul(Mat.rotate(v.a), Mat.translate(v.tx, 0)), alt: Mat.mul(Mat.translate(v.tx, 0), Mat.rotate(v.a)) }) },
+ null
+];
+function mountDemo(i){
+  const d = DEMOS[i], v = {};
+  d.params.forEach(q => v[q.k] = q.val);
+  $("demoBox").innerHTML = '<canvas id="ldemo" style="width:100%;max-width:340px;aspect-ratio:1/1;background:var(--panel2);border-radius:8px;border:1px solid var(--line)"></canvas><div id="dCtl" style="margin-top:8px"></div><div id="dOut"></div>';
+  const paint = () => {
+    const c = $("ldemo"), g = c.getContext("2d"), r = c.getBoundingClientRect(), dp = window.devicePixelRatio || 1;
+    c.width = r.width * dp; c.height = r.width * dp;
+    const W = c.width, u = W / 12, X = x => W/2 + x*u, Y = y => W/2 - y*u;
+    g.clearRect(0, 0, W, W); g.strokeStyle = css("--line"); g.lineWidth = 1;
+    for (let k = -6; k <= 6; k++){ g.beginPath(); g.moveTo(X(k), 0); g.lineTo(X(k), W); g.moveTo(0, Y(k)); g.lineTo(W, Y(k)); g.stroke(); }
+    g.strokeStyle = css("--muted"); g.lineWidth = 2; g.beginPath(); g.moveTo(0, W/2); g.lineTo(W, W/2); g.moveTo(W/2, 0); g.lineTo(W/2, W); g.stroke();
+    const pts = (d.pts || SHAPES.square()).map(([x, y]) => ({ x, y })), res = d.build(v);
+    const path = m => { g.beginPath(); pts.forEach((q, k) => { const t = Mat.apply(m, q); k ? g.lineTo(X(t.x), Y(t.y)) : g.moveTo(X(t.x), Y(t.y)); }); g.closePath(); };
+    g.setLineDash([6, 5]); g.strokeStyle = css("--teal"); g.lineWidth = 2; path(Mat.identity()); g.stroke(); g.setLineDash([]);
+    if (res.alt){ g.strokeStyle = css("--cyan"); g.lineWidth = 3; path(res.alt); g.stroke(); }
+    path(res.main); g.fillStyle = "rgba(232,135,58,.35)"; g.fill(); g.strokeStyle = css("--orange"); g.lineWidth = 3; g.stroke();
+    const q = pts[0], t = Mat.apply(res.main, q);
+    $("dOut").innerHTML = (d.alt ? '<p class="tag">Orange: move first, then turn. Cyan: turn first, then move. They end in different places.</p>' : "") +
+      "<b>Matrix</b><br>" + matHTML(res.main) + (d.readout ? `<p class="tag">Corner A: (${fmt(q.x)}, ${fmt(q.y)}, 1) becomes (${fmt(t.x)}, ${fmt(t.y)}, 1)</p>` : "");
+  };
+  d.params.forEach(q => {
+    const w = document.createElement("div"); w.className = "ctl";
+    if (q.opts){
+      w.innerHTML = `<label>${q.label}</label><select style="grid-column:2/4">${q.opts.map(o => `<option value="${o[0]}" ${o[0] === q.val ? "selected" : ""}>${o[1]}</option>`).join("")}</select>`;
+      w.querySelector("select").onchange = e => { v[q.k] = e.target.value; paint(); };
+    } else {
+      w.innerHTML = `<label>${q.label}</label><input type="range" min="${q.min}" max="${q.max}" step="${q.step}" value="${q.val}"><input type="number" step="${q.step}" value="${q.val}">`;
+      const [, r, n] = w.children;
+      const set = x => { let val = parseFloat(x); if (!Number.isFinite(val)) val = q.val; val = Math.min(Math.max(val, q.min), q.max); v[q.k] = val; r.value = n.value = val; paint(); };
+      r.oninput = () => set(r.value); n.onchange = () => set(n.value);
+    }
+    $("dCtl").appendChild(w);
+  });
+  paint();
+}
+function renderLessons(){
+  const done = store.get("lessons2", {}), root = $("learnRoot"), total = LESSONS.length, n = Object.keys(done).length;
+  if (!lessonView){ // course overview, like a normal course page
+    const next = LESSONS.findIndex((l, i) => !done[i]);
+    const card = i => `<button class="lcard" data-i="${i}"><span class="chip ${done[i] ? "done" : ""}">${done[i] ? "Done" : "Not started"}</span><b>${i + 1}. ${LESSONS[i][0]}</b><span class="tag">${META[i][0]}</span><span class="tag">${META[i][1]} min</span></button>`;
+    const section = (lvl, sub) => { const ids = LESSONS.map((l, i) => i).filter(i => LESSONS[i][7] === lvl), c = ids.filter(i => done[i]).length;
+      return `<h3 style="margin:18px 0 4px">${lvl}</h3><p class="sub" style="margin-bottom:8px">${sub} ${c} of ${ids.length} done.</p><div class="lgrid">${ids.map(card).join("")}</div>`; };
+    root.innerHTML = `<h1>Learning Center</h1><p class="sub">Ten short lessons. Start with Easy, then move on to Medium.</p>
+      <div class="card"><div class="row sp"><b>Your progress: ${n} of ${total} lessons</b><button class="btn main" id="contBtn">${n === 0 ? "Start lesson 1" : next < 0 ? "Review lessons" : "Continue with lesson " + (next + 1)}</button></div><div class="bar" style="margin-top:10px"><i style="width:${n / total * 100}%"></i></div></div>` +
+      section("Easy", "The basics: moving, resizing, turning, and flipping.") + section("Medium", "Slanting, matrices, and the order of steps.");
+    root.querySelectorAll(".lcard").forEach(b => b.onclick = () => { lesson = +b.dataset.i; lessonView = true; renderLessons(); window.scrollTo(0, 0); });
+    $("contBtn").onclick = () => { lesson = next < 0 ? 0 : next; lessonView = true; renderLessons(); window.scrollTo(0, 0); };
+    return;
+  }
+  const l = LESSONS[lesson], d = DEMOS[lesson];
+  root.innerHTML = `<button class="btn" id="backL">← All lessons</button>
+   <p class="tag" style="margin:12px 0 4px">Learning Center / ${l[7]} / Lesson ${lesson + 1} of ${total}</p>
+   <h1>${l[0]}</h1><p class="sub">${META[lesson][0]} About ${META[lesson][1]} minutes. ${done[lesson] ? "You finished this one." : ""}</p>
+   <div class="card"><h3>1. Learn</h3><p>${l[1]}</p><p><b>Formula:</b> <code>${l[2]}</code></p><p>${l[3]}</p><p><b>Steps</b></p><ol>${l[8].map(x => `<li>${x}</li>`).join("")}</ol></div>
+   <div class="card" style="margin-top:12px"><h3>2. Try it here</h3>${d ? '<div id="demoBox"></div>' : "<p>This lesson is easier to understand in the 3D lab. Open it, then use the back button to return here.</p>"}
+     <div class="row" style="margin-top:10px"><button class="btn" id="fullBtn">Open the full lab</button></div></div>
+   <div class="card" style="margin-top:12px"><h3>3. Example and common mistake</h3><p><b>Example:</b> ${l[4]}</p><p><b>Mistake to avoid:</b> ${l[5]}</p></div>
+   <div class="row sp" style="margin-top:14px"><button class="btn" id="prevL" ${lesson === 0 ? "disabled" : ""}>Previous</button><button class="btn main" id="doneBtn">${done[lesson] ? "Completed" : "Mark complete"}</button><button class="btn" id="nextL" ${lesson === total - 1 ? "disabled" : ""}>Next</button></div>`;
+  if (d) mountDemo(lesson);
+  $("backL").onclick = () => { lessonView = false; renderLessons(); window.scrollTo(0, 0); };
+  $("fullBtn").onclick = () => { // go to the real lab, and a back button brings you here again
+    const [where, patch] = l[6]; const from = lesson;
+    if (where === "3d"){ go("3d"); setState3(patch); } else { if (where !== "compare") setState2(patch || {}); go(where); }
+    backLesson = from; $("backBtn").style.display = "block";
+  };
+  $("doneBtn").onclick = () => { toast("Lesson marked complete"); const dn = store.get("lessons2", {}); if (!dn[lesson]) logAct("Completed lesson: " + l[0]); dn[lesson] = true; store.set("lessons2", dn); renderLessons(); };
+  $("prevL").onclick = () => { lesson--; renderLessons(); window.scrollTo(0, 0); };
+  $("nextL").onclick = () => { lesson++; renderLessons(); window.scrollTo(0, 0); };
+}
+$("backBtn").onclick = () => { lesson = backLesson; lessonView = true; pendingOpen = true; go("learn"); };
+
+$("resetProg").onclick = () => { if (!confirm("Reset all lesson progress?")) return; store.set("activity", []); store.set("lessons2", {}); renderProgress(); toast("Learning progress reset"); };
+
+/* =========================================================
+   8h. TOP BAR, DASHBOARD, SEARCH, NOTIFICATIONS
+   ========================================================= */
+const ago = ts => { const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? "just now" : m < 60 ? m + "m ago" : m < 1440 ? Math.round(m/60) + "h ago" : Math.round(m/1440) + "d ago"; };
+function logAct(t){ const a = store.get("activity", []); a.unshift({ t, at: Date.now() }); store.set("activity", a.slice(0, 20)); }
+function renderDash(){
+  const done = store.get("lessons2", {}), n = Object.keys(done).length, pct = Math.round(n / LESSONS.length * 100);
+  $("ringTxt").textContent = pct + "%"; $("ringArc").setAttribute("stroke-dasharray", `${pct * 2.513} 251.3`);
+  $("lessonsDone").textContent = `${n} / ${LESSONS.length}`;
+  const names = Object.keys(done).slice(-3).map(i => LESSONS[i][0]);
+  $("doneList").innerHTML = names.length ? names.map(x => `<li>${x}<span>✓</span></li>`).join("") : "<li class='tag'>Complete a lesson to see it here.</li>";
+  const act = store.get("activity", []).slice(0, 3);
+  $("actList").innerHTML = act.length ? act.map(a => `<li><span>${a.t}</span><span class="tag">${ago(a.at)}</span></li>`).join("") : "<li class='tag'>Nothing yet. Try the 2D lab.</li>";
+}
+const drops = () => document.querySelectorAll(".drop");
+const toggleDrop = el => { const open = el.classList.contains("open"); drops().forEach(d => d.classList.remove("open")); if (!open) el.classList.add("open"); };
+document.addEventListener("click", e => { if (!e.target.closest(".rel")) drops().forEach(d => d.classList.remove("open")); });
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+document.querySelectorAll("[data-lesson]").forEach(b => b.onclick = () => openLesson(+b.dataset.lesson));
+$("avatar").onclick = () => toggleDrop($("umenu"));
+$("themeSw").onchange = e => { prefs.theme = e.target.checked ? "dark" : "light"; applyPrefs(); };
+// notifications: unread count is remembered
+const NOTES = ["New: the Compare page shows why transformation order matters.", "Tip: set a pivot point before you rotate or scale.", "Finish a lesson to fill up your progress ring."];
+function renderNotes(){
+  const read = store.get("notesRead", false);
+  $("badge").style.display = read ? "none" : "";
+  $("notes").innerHTML = NOTES.map(n => `<p>${n}</p>`).join("");
+}
+$("bell").onclick = () => { toggleDrop($("notes")); store.set("notesRead", true); renderNotes(); };
+// search over pages and lessons
+const SEARCH = [...NAV.map(([id, l]) => ({ l, run: () => go(id) })), ...LESSONS.map((x, i) => ({ l: "Lesson: " + x[0], run: () => openLesson(i) }))];
+$("q").oninput = e => {
+  const v = e.target.value.trim().toLowerCase(), box = $("qres");
+  const hits = v ? SEARCH.filter(x => x.l.toLowerCase().includes(v)).slice(0, 6) : [];
+  box.innerHTML = hits.length ? hits.map((h, i) => `<button class="btn" data-i="${i}">${h.l}</button>`).join("") : (v ? "<p>No match. Try a word like rotate or matrix.</p>" : "");
+  box.classList.toggle("open", !!v);
+  box.querySelectorAll("button").forEach((b, i) => b.onclick = () => { hits[i].run(); $("q").value = ""; box.classList.remove("open"); });
+};
+$("q").onkeydown = e => { if (e.key === "Enter"){ const b = $("qres").querySelector("button"); if (b) b.click(); } };
+
+/* =========================================================
+   8i. DRAW YOUR OWN SHAPE, AUTO DETECT, AND LINK TO 3D
+   ========================================================= */
+let customPts = store.get("customPts", null);
+SHAPES.custom = () => customPts || [];
+const drawing = { on:false, pts:[] };
+const NAME3 = { square:"Cube", rectangle:"Rectangular prism", triangle:"Triangular prism", pentagon:"Pentagonal prism", circle:"Sphere", quadrilateral:"Quadrilateral prism", polygon:"Prism" };
+
+// Looks at the clicked points and names the shape (sides, equal lengths, right angles)
+function detectShape(pts){
+  const n = pts.length; if (n < 3) return "none";
+  const d = (a, b) => Math.hypot(a[0]-b[0], a[1]-b[1]);
+  const sides = pts.map((p, i) => d(p, pts[(i+1) % n]));
+  const cx = pts.reduce((t, p) => t + p[0], 0) / n, cy = pts.reduce((t, p) => t + p[1], 0) / n;
+  const radii = pts.map(p => d(p, [cx, cy])), rMean = radii.reduce((a, b) => a + b) / n;
+  const near = (a, b) => Math.abs(a - b) <= 0.12 * Math.max(a, b);
+  const rightAt = i => { const a = pts[(i+n-1) % n], b = pts[i], c = pts[(i+1) % n];
+    const v = [a[0]-b[0], a[1]-b[1]], w = [c[0]-b[0], c[1]-b[1]];
+    return Math.abs(v[0]*w[0] + v[1]*w[1]) / (Math.hypot(...v) * Math.hypot(...w)) < 0.12; };
+  if (n >= 10 && (Math.max(...radii) - Math.min(...radii)) / rMean < 0.12) return "circle";
+  if (n === 3) return "triangle";
+  if (n === 4) return [0,1,2,3].every(rightAt) ? (near(sides[0], sides[1]) ? "square" : "rectangle") : "quadrilateral";
+  return n === 5 ? "pentagon" : "polygon";
+}
+function kind2d(){ const k = state.shape; return k === "custom" ? detectShape(customPts || []) : (k === "rect" ? "rectangle" : k); }
+function showDetected(){
+  if (drawing.on) return;
+  const k = kind2d();
+  $("detected").textContent = NAME3[k] ? `Detected: ${k}. In 3D it becomes a ${NAME3[k].toLowerCase()}.` : "Draw a shape or pick one from the list.";
+}
+function toUnits(e){ // pixel to plane units, snapped to half units
+  const r = canvas.getBoundingClientRect(), snap = v => view.r >= 20 ? Math.round(v) : Math.round(v * 2) / 2; // coarser snap when zoomed out
+  const nx = (e.clientX - r.left - r.width / 2) / r.height, ny = (e.clientY - r.top) / r.height - 0.5;
+  return [snap(view.ox + nx * view.r * 2), snap(view.oy - ny * view.r * 2)];
+}
+function finishDraw(){
+  if (drawing.pts.length < 3){ $("detected").textContent = "Add at least 3 points first."; return; }
+  customPts = drawing.pts.slice(); store.set("customPts", customPts);
+  drawing.on = false; drawing.pts = []; $("drawBtn").textContent = "Draw shape";
+  anim2.pause(); Object.assign(state, DEFAULTS, { shape: "custom" }); $("shape").value = "custom"; $("refl").value = "none";
+  resetPivot(); Object.keys(sliders).forEach(k => sliders[k].range.value = sliders[k].num.value = state[k]);
+  update(); toast("Shape drawn. Rotate and scale now happen around its center.");
+}
+canvas.addEventListener("pointerdown", e => {
+  if (!drawing.on) return;
+  const p = toUnits(e), f = drawing.pts[0];
+  if (f && drawing.pts.length >= 3 && Math.hypot(p[0]-f[0], p[1]-f[1]) < 0.6){ finishDraw(); return; } // clicked the first point again
+  if (drawing.pts.some(q => q[0] === p[0] && q[1] === p[1])) return;
+  drawing.pts.push(p); draw();
+});
+$("drawBtn").onclick = () => {
+  drawing.on = !drawing.on; drawing.pts = [];
+  $("drawBtn").textContent = drawing.on ? "Drawing... tap the plane" : "Draw shape";
+  if (drawing.on) $("detected").textContent = "Tap points on the plane. Tap the first point again or press Finish.";
+  draw(); if (!drawing.on) showDetected();
+};
+$("finBtn").onclick = finishDraw;
+$("clrBtn").onclick = () => {
+  drawing.on = false; drawing.pts = []; customPts = null; store.set("customPts", null); $("drawBtn").textContent = "Draw shape";
+  if (state.shape === "custom"){ state.shape = "square"; $("shape").value = "square"; resetPivot(); }
+  update();
+};
+$("to3d").onclick = () => { $("link3").checked = true; go("3d"); };
+
+// 3D side: the same 2D outline pulled out into a solid (extrude), so it stays the same shape
+function extrude2d(){
+  const pts = SHAPES[state.shape] ? SHAPES[state.shape]() : [];
+  if (pts.length < 3) return new THREE.BoxGeometry(2, 2, 2);
+  const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+  const depth = Math.max(0.5, Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))); // a square gives a true cube
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(q => new THREE.Vector2(q[0], q[1]))), { depth, bevelEnabled:false });
+  g.translate(0, 0, -depth / 2); return g; // only center the depth, so x and y stay the same as the 2D plane
+}
+// Turns the 2D final matrix (3x3) into a 4x4 so the 3D object follows what you did in the 2D lab
+function lift2d(t){
+  const m = new THREE.Matrix4();
+  if (!$("link3").checked) return m;
+  const a = finalMatrix(lerp2(state, t));
+  return m.set(a[0][0], a[0][1], 0, a[0][2],  a[1][0], a[1][1], 0, a[1][2],  0, 0, 1, 0,  0, 0, 0, 1);
+}
+function syncLink(){
+  if (!$("link3").checked) return;
+  const k = kind2d(); if (!NAME3[k]) return;
+  Object.keys(MAP3).forEach(key => S3[key] = D3[key]); S3.tx = S3.ty = 0; syncUI3(); // these values now live in the 2D state
+  $("obj3").value = k === "circle" ? "sphere" : "from2d";
+  $("info3").textContent = `Linked to your 2D shape: ${NAME3[k]}. Your 2D move, rotate, scale, shear and reflect carry over. The 3D sliders add on top.`;
+  if (ready3) setObj3();
+}
+$("link3").onchange = () => { if ($("link3").checked) syncLink(); else unlink3(); };
+function unlink3(){ // keep what you see: copy the shared values into the 3D sliders
+  Object.entries(MAP3).forEach(([k, sk]) => S3[k] = state[sk]); S3.tx += state.tx; S3.ty += state.ty;
+  $("info3").textContent = ""; syncUI3(); update3();
+}
+function syncUI2(){
+  Object.keys(sliders).forEach(k => sliders[k].range.value = sliders[k].num.value = state[k]);
+  $("refl").value = state.refl; $("shape").value = state.shape;
+}
+
+/* =========================================================
+   8j. POINT LABELS (2D handled in draw, 3D uses small HTML labels placed over the canvas)
+   ========================================================= */
+$("lbl2").onchange = () => draw();
+const labels3 = [];
+let vertList = [];
+function addLabel(kind, text, pos, color){
+  const el = document.createElement("span"); el.className = "lab3"; el.textContent = text; el.style.color = color;
+  $("stage3").appendChild(el);
+  const l = { kind, el, pos: new THREE.Vector3(pos[0], pos[1], pos[2]) }; labels3.push(l); return l;
+}
+function addAxisLabels(){
+  [["X",[6.7,0,0],"#e05a4f"],["Y",[0,6.7,0],"#4fb06a"],["Z",[0,0,6.7],"#4f8fe0"]].forEach(([t, p, c]) => {
+    const l = addLabel("axis", t, p, c); l.el.style.fontWeight = "700"; l.el.style.fontSize = "15px"; });
+  for (let v = 2; v <= 6; v += 2) [[v,-.35,0],[-.35,v,0],[0,-.35,v]].forEach(pos => { addLabel("axis", v, pos, "#8fa0ba").el.style.fontSize = "10px"; });
+  addLabel("axis", "O", [-.3,-.3,0], "#8fa0ba");
+}
+function buildVertexLabels(g){
+  for (let i = labels3.length - 1; i >= 0; i--) if (labels3[i].kind === "vert"){ labels3[i].el.remove(); labels3.splice(i, 1); }
+  const a = g.attributes.position, seen = new Set(); vertList = [];
+  for (let i = 0; i < a.count; i++){
+    const k = [a.getX(i), a.getY(i), a.getZ(i)].map(v => v.toFixed(3)).join();
+    if (!seen.has(k)){ seen.add(k); vertList.push(new THREE.Vector3(a.getX(i), a.getY(i), a.getZ(i))); }
+  }
+  if (vertList.length > 24){ vertList = []; return; } // spheres and cones have too many points to label
+  vertList.forEach((v, i) => { addLabel("vert", "", [0,0,0], "#e8873a").idx = i; });
+}
+function moveVertexLabels(m){
+  const f = n => (+n.toFixed(1)).toString(), rows = [];
+  labels3.filter(l => l.kind === "vert").forEach(l => {
+    const o = vertList[l.idx], w = o.clone().applyMatrix4(m), nm = String.fromCharCode(65 + l.idx % 26); // world position = matrix x original point
+    l.pos.copy(w); l.el.textContent = $("lblc3").checked ? `${nm}(${f(w.x)}, ${f(w.y)}, ${f(w.z)})` : nm; // letters by default, full numbers are in the table below
+    rows.push(`<tr><td>${nm}</td><td>(${f(o.x)}, ${f(o.y)}, ${f(o.z)})</td><td>(${f(w.x)}, ${f(w.y)}, ${f(w.z)})</td></tr>`);
+  });
+  $("tbl3").innerHTML = rows.length ? `<tr><th>Point</th><th>Original</th><th>Transformed</th></tr>${rows.join("")}` : "";
+}
+function placeLabels(box){
+  const w = box.clientWidth, h = box.clientHeight;
+  labels3.forEach(l => {
+    const v = l.pos.clone().project(cam);
+    const on = v.z < 1 && (l.kind === "axis" ? axes3.visible : $("lbl3").checked);
+    l.el.style.display = on ? "" : "none";
+    if (on) l.el.style.transform = `translate(${(v.x*.5+.5)*w}px, ${(-v.y*.5+.5)*h}px) translate(-50%,-120%)`;
+  });
+}
+
+/* =========================================================
+   8k. ZOOM AND PAN FOR THE 2D PLANE (wheel, pinch, drag, buttons)
+   ========================================================= */
+function zoomAt(clientX, clientY, factor){ // factor above 1 zooms out, below 1 zooms in
+  const rect = canvas.getBoundingClientRect();
+  const nx = (clientX - rect.left - rect.width / 2) / rect.height, ny = (clientY - rect.top) / rect.height - 0.5;
+  const wx = view.ox + nx * view.r * 2, wy = view.oy - ny * view.r * 2; // the point under the finger or cursor
+  view.r = Math.min(80, Math.max(2, view.r * factor));
+  view.ox = wx - nx * view.r * 2; view.oy = wy + ny * view.r * 2;       // keep that point where it was
+}
+const zoomCenter = f => { const r = canvas.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, f); draw(); };
+$("zin").onclick = () => zoomCenter(0.7);
+$("zout").onclick = () => zoomCenter(1 / 0.7);
+$("zreset").onclick = () => { view.r = 10; view.ox = 0; view.oy = 0; draw(); };
+canvas.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(e.deltaY * 0.0015)); draw(); }, { passive:false });
+const touches = new Map();
+
+/* ----- Free move: drag the orange shape with the mouse (or one finger). Lock stops it. ----- */
+const MOVE_LIM = 20; // same limit as the Move X / Y sliders
+const lock = { on: store.get("lock", false), warned: false };
+const drag = { id: null, gx: 0, gy: 0, tx0: 0, ty0: 0 };
+const toWorld = e => { // pixel to plane units, no snapping
+  const r = canvas.getBoundingClientRect();
+  return [view.ox + (e.clientX - r.left - r.width / 2) / r.height * view.r * 2, view.oy - ((e.clientY - r.top) / r.height - 0.5) * view.r * 2];
+};
+function hitShape(e){ // is the pointer on the shape that is drawn right now (original positions moved by the matrix)
+  const base = SHAPES[state.shape]();
+  if (base.length < 3) return false;
+  const M = finalMatrix(lerp2(state, anim2.t)), pts = base.map(([x, y]) => Mat.apply(M, { x, y }));
+  const [wx, wy] = toWorld(e), tol = 8 * view.r * 2 / canvas.getBoundingClientRect().height; // 8 px grab margin
+  let inside = false, near = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+    const a = pts[i], b = pts[j];
+    if ((a.y > wy) !== (b.y > wy) && wx < (b.x - a.x) * (wy - a.y) / (b.y - a.y) + a.x) inside = !inside;
+    const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy;
+    const t = L ? Math.min(1, Math.max(0, ((wx - a.x) * dx + (wy - a.y) * dy) / L)) : 0;
+    if (Math.hypot(wx - (a.x + t * dx), wy - (a.y + t * dy)) <= tol) near = true;
+  }
+  return inside || near;
+}
+let hudOn = store.get("hud", true);
+function applyHud(){ ["hud2", "hud3"].forEach(id => { const h = $(id); if (h) h.style.display = hudOn ? "" : "none"; }); $("hudc2").checked = $("hudc3").checked = hudOn; }
+["hudc2", "hudc3"].forEach(id => $(id).onchange = e => { hudOn = e.target.checked; store.set("hud", hudOn); applyHud(); });
+
+/* ----- 3D free move: grab the object, drag on a plane that faces the camera. Empty space still orbits. ----- */
+const drag3 = { id: null, p0: null, plane: null, t0: null }, ptr3 = new Set();
+function hit3(e, dom){
+  if (!mesh) return null;
+  const r = dom.getBoundingClientRect(), rc = new THREE.Raycaster();
+  mesh.updateMatrixWorld(true);
+  rc.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height * 2 - 1)), cam);
+  const h = rc.intersectObject(mesh, false); return h.length ? h[0].point : null;
+}
+function bind3Drag(dom){
+  const L = 20, c = v => Math.min(L, Math.max(-L, Math.round(v * 100) / 100));
+  dom.addEventListener("pointerdown", e => {
+    ptr3.add(e.pointerId);
+    if (ptr3.size > 1){ drag3.id = null; ctl3.enabled = true; return; }     // two fingers: orbit and zoom
+    if (e.button !== 0) return;
+    const pt = hit3(e, dom); if (!pt) return;                                // empty space: normal orbit
+    if (lock.on){ if (!lock.warned){ lock.warned = true; toast("Shape is locked. Press Unlock to move it."); } return; }
+    anim3.reset(); ctl3.enabled = false;                                     // stop orbit while we hold the object
+    Object.assign(drag3, { id: e.pointerId, p0: pt.clone(), t0: { x: S3.tx, y: S3.ty, z: S3.tz },
+      plane: new THREE.Plane().setFromNormalAndCoplanarPoint(cam.getWorldDirection(new THREE.Vector3()), pt) });
+    try { dom.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+    dom.style.cursor = "grabbing";
+  }, true);
+  dom.addEventListener("pointermove", e => {
+    if (drag3.id === e.pointerId){
+      const rc = new THREE.Raycaster(), r = dom.getBoundingClientRect(), p = new THREE.Vector3();
+      rc.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height * 2 - 1)), cam);
+      if (rc.ray.intersectPlane(drag3.plane, p)){
+        p.sub(drag3.p0);
+        S3.tx = c(drag3.t0.x + p.x); S3.ty = c(drag3.t0.y + p.y); S3.tz = c(drag3.t0.z + p.z);
+        ["tx", "ty", "tz"].forEach(k => sl3[k].r.value = sl3[k].n.value = S3[k]);
+        update3();
+      }
+    } else if (!ptr3.size && e.pointerType === "mouse") dom.style.cursor = hit3(e, dom) ? (lock.on ? "not-allowed" : "grab") : "";
+  });
+  ["pointerup", "pointercancel"].forEach(t => dom.addEventListener(t, e => {
+    ptr3.delete(e.pointerId);
+    if (drag3.id === e.pointerId){ drag3.id = null; dom.style.cursor = "grab"; }
+    if (!ptr3.size) ctl3.enabled = true;
+  }));
+}
+function applyLock(){
+  const L = lock.on, b = $("lockBtn");
+  ["tx", "ty", "tz"].forEach(k => {
+    if (sliders[k]) sliders[k].range.disabled = sliders[k].num.disabled = L;            // 2D Move X / Y
+    if (sl3[k]) sl3[k].r.disabled = sl3[k].n.disabled = L;             // 3D Move X / Y
+  });
+  b.textContent = L ? "🔒 Locked" : "🔓 Lock position"; b.setAttribute("aria-pressed", L);
+  canvas.style.cursor = "default";
+}
+$("lockBtn").onclick = () => {
+  lock.on = !lock.on; lock.warned = false; store.set("lock", lock.on); drag.id = null;
+  applyLock(); draw(); toast(lock.on ? "Position locked. Mouse drag now moves the view only." : "Position unlocked. Drag the shape to move it.");
+};
+$("link3").addEventListener("change", applyLock);
+$("obj3").addEventListener("change", applyLock);
+function moveDrag(e){
+  const [wx, wy] = toWorld(e), c = v => Math.min(MOVE_LIM, Math.max(-MOVE_LIM, Math.round(v * 100) / 100));
+  state.tx = c(drag.tx0 + wx - drag.gx); state.ty = c(drag.ty0 + wy - drag.gy);
+  sliders.tx.range.value = sliders.tx.num.value = state.tx; sliders.ty.range.value = sliders.ty.num.value = state.ty;
+  update();
+}
+canvas.addEventListener("pointerdown", e => {
+  if (drawing.on) return;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* some touch pointers cannot be captured, panning still works */ }
+  touches.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if (touches.size > 1){ drag.id = null; return; }       // second finger means pinch, not shape drag
+  if (e.button !== 0 || !hitShape(e)) return;             // empty space (or right/middle click) pans the view
+  if (lock.on){ if (!lock.warned){ lock.warned = true; toast("Shape is locked. Press Unlock to move it."); } return; }
+  anim2.reset();                                          // stop any animation so the shape you grab is the one you see
+  const [wx, wy] = toWorld(e);
+  Object.assign(drag, { id: e.pointerId, gx: wx, gy: wy, tx0: state.tx, ty0: state.ty });
+  canvas.style.cursor = "grabbing"; draw();
+});
+canvas.addEventListener("pointermove", e => {
+  if (!touches.has(e.pointerId)){ // plain hover, only the cursor changes
+    if (e.pointerType === "mouse") canvas.style.cursor = drawing.on ? "crosshair" : hitShape(e) ? (lock.on ? "not-allowed" : "grab") : "default";
+    return;
+  }
+  const prev = touches.get(e.pointerId), cur = { x:e.clientX, y:e.clientY };
+  if (drag.id === e.pointerId && touches.size === 1){ moveDrag(e); touches.set(e.pointerId, cur); return; }
+  if (touches.size === 1){ // one finger or mouse drag on empty space moves the view
+    const r = canvas.getBoundingClientRect(), perPx = view.r * 2 / r.height;
+    view.ox -= (cur.x - prev.x) * perPx; view.oy += (cur.y - prev.y) * perPx;
+  } else if (touches.size === 2){ // two fingers pinch to zoom
+    const other = [...touches.entries()].find(([id]) => id !== e.pointerId)[1];
+    const d0 = Math.hypot(prev.x - other.x, prev.y - other.y), d1 = Math.hypot(cur.x - other.x, cur.y - other.y);
+    if (d0 > 0 && d1 > 0) zoomAt((cur.x + other.x) / 2, (cur.y + other.y) / 2, d0 / d1);
+  }
+  touches.set(e.pointerId, cur); draw();
+});
+["pointerup", "pointercancel"].forEach(t => canvas.addEventListener(t, e => {
+  touches.delete(e.pointerId);
+  if (drag.id === e.pointerId){ drag.id = null; canvas.style.cursor = "grab"; draw(); }
+}));
+
+// Moves the camera back far enough to see the whole object and the origin
+function fitCam(){
+  if (!mesh || !cam) return;
+  mesh.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(mesh); box.expandByPoint(new THREE.Vector3(0, 0, 0));
+  const sphere = box.getBoundingSphere(new THREE.Sphere()), r = Math.max(sphere.radius, 4);
+  const dist = r / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2)) * 1.15;
+  ctl3.target.copy(sphere.center);
+  cam.position.copy(sphere.center).add(new THREE.Vector3(1, 0.8, 1.3).normalize().multiplyScalar(dist));
+  ctl3.update();
+}
+$("lblc3").onchange = () => update3();
+
+function toast(msg){ // small message at the bottom so every button gives feedback
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+/* =========================================================
+   9. START
+   ========================================================= */
+window.addEventListener("resize", draw);
+try {
+  state.shape = prefs.shape || "square"; $("shape").value = state.shape; applyPrefs(); applyLock(); applyHud(); syncStInputs(); renderTables(); renderSeq(); renderNotes(); renderDash(); showDetected(); spin();
+  const last = store.get("view", "dashboard");
+  go(NAV.some(n => n[0] === last) ? last : "dashboard");
+} catch (err) { console.error("TransformLab failed to start:", err); }
+</script>
+</body>
+</html>
